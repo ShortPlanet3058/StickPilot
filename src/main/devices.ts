@@ -169,8 +169,11 @@ export class DeviceManager extends EventEmitter {
   }
 
   /**
-   * Lists hosts on the local /24 networks that answer on the adb port. It only checks
-   * the port: connecting would show an approval prompt on the device, so that's left to the user.
+   * Finds TVs and adb devices on the local /24 networks. Each address is checked for
+   * the adb port and for the TV description ports: Fire TVs publish their name at
+   * :60000/dd.xml (DIAL), Android/Google TVs at :8008/ssdp/device-desc.xml. Nothing
+   * is connected: connecting shows an approval prompt on the device, so that stays
+   * the user's choice. Only local traffic.
    */
   async scanNetwork(): Promise<ScanResult[]> {
     const own = new Set<string>();
@@ -182,23 +185,39 @@ export class DeviceManager extends EventEmitter {
         bases.add(a.address.split('.').slice(0, 3).join('.'));
       }
     }
-    const targets = [...bases].slice(0, 2).flatMap((b) => Array.from({ length: 254 }, (_, i) => `${b}.${i + 1}`))
+    const ips = [...bases].slice(0, 2).flatMap((b) => Array.from({ length: 254 }, (_, i) => `${b}.${i + 1}`))
       .filter((ip) => !own.has(ip));
-    const open: string[] = [];
+    const PORTS = [DEFAULT_ADB_PORT, 60000, 8008];
+    const jobs = ips.flatMap((ip) => PORTS.map((port) => ({ ip, port })));
+    const open = new Map<string, Set<number>>();
     let next = 0;
     const worker = async () => {
-      while (next < targets.length) {
-        const ip = targets[next++];
-        if (await portOpen(ip, DEFAULT_ADB_PORT, 400)) open.push(ip);
+      while (next < jobs.length) {
+        const { ip, port } = jobs[next++];
+        if (await portOpen(ip, port, 400)) {
+          if (!open.has(ip)) open.set(ip, new Set());
+          open.get(ip)!.add(port);
+        }
       }
     };
-    await Promise.all(Array.from({ length: 64 }, worker));
+    await Promise.all(Array.from({ length: 96 }, worker));
+
     const known = new Set(this.raw.map((d) => d.serial));
-    return Promise.all(open.sort(ipCompare).map(async (ip) => ({
-      host: `${ip}:${DEFAULT_ADB_PORT}`,
-      name: await reverseName(ip),
-      connected: known.has(`${ip}:${DEFAULT_ADB_PORT}`),
-    })));
+    const results = await Promise.all([...open].map(async ([ip, ports]): Promise<ScanResult | null> => {
+      const desc = ports.has(60000) ? await tvDescription(`http://${ip}:60000/dd.xml`)
+        : ports.has(8008) ? await tvDescription(`http://${ip}:8008/ssdp/device-desc.xml`) : null;
+      if (!desc && !ports.has(DEFAULT_ADB_PORT)) return null; // something else with an open web port
+      const host = `${ip}:${DEFAULT_ADB_PORT}`;
+      const kind: DeviceKind = desc ? (/amazon/i.test(desc.manufacturer) ? 'firetv' : 'tv') : 'unknown';
+      return {
+        host, ip, kind,
+        name: desc?.name || (await reverseName(ip)),
+        model: desc?.model ?? '',
+        adb: ports.has(DEFAULT_ADB_PORT),
+        connected: known.has(host),
+      };
+    }));
+    return results.filter((r): r is ScanResult => !!r).sort((a, b) => ipCompare(a.ip, b.ip));
   }
 
   async disconnectNetwork(input: string): Promise<void> {
@@ -222,6 +241,12 @@ function humanizeConnectError(out: string, host: string): string {
     return `${host} refused the connection. Turn on ADB debugging on the TV (Settings → My Fire TV → Developer options).`;
   }
   if (/unknown host|No such host|cannot resolve/i.test(out)) return `Unknown address: ${host}`;
+  // macOS 15+ reports local-network access it hasn't allowed as "No route to host"
+  if (/No route to host|EHOSTUNREACH/i.test(out)) {
+    return process.platform === 'darwin'
+      ? `Can't reach ${host}. If macOS asked whether StickPilot may find devices on your local network, allow it: System Settings → Privacy & Security → Local Network.`
+      : `Can't reach ${host}. Check that the TV is on and on the same network.`;
+  }
   const detail = out.replace(/^adb connect: /, '').replace(/^Command failed:.*$/m, '').trim();
   return detail ? `Could not connect to ${host}: ${detail}` : `Could not connect to ${host}.`;
 }
@@ -249,3 +274,17 @@ async function reverseName(ip: string): Promise<string> {
 }
 
 const ipCompare = (a: string, b: string) => Number(a.split('.')[3]) - Number(b.split('.')[3]);
+
+/** friendlyName / manufacturer / model from a UPnP device description */
+async function tvDescription(url: string): Promise<{ name: string; manufacturer: string; model: string } | null> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(1500) });
+    if (!res.ok) return null;
+    const xml = await res.text();
+    const tag = (t: string) => (new RegExp(`<${t}>([^<]*)</${t}>`).exec(xml)?.[1] ?? '').replace(/&amp;/g, '&').replace(/&apos;|&#39;/g, "'").trim();
+    const name = tag('friendlyName');
+    return name ? { name, manufacturer: tag('manufacturer'), model: tag('modelName') } : null;
+  } catch {
+    return null;
+  }
+}

@@ -13,6 +13,7 @@ const DEFAULTS: Settings = {
   homeTab: 'firetv',
   remoteOnTop: false,
   favoriteApps: {},
+  hiddenDevices: [],
   audioEnabled: false,
   mediaKeys: false,
 };

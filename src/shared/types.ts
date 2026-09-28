@@ -67,6 +67,8 @@ export interface Settings {
   remoteOnTop: boolean;
   /** Pinned apps (package names) per physical device (hardwareId) */
   favoriteApps: Record<string, string[]>;
+  /** Devices removed while still plugged in (hardwareId or serial), kept out of the lists */
+  hiddenDevices: string[];
   /** Play the device's sound on this computer (the device goes silent meanwhile on Android 11-12) */
   audioEnabled: boolean;
   /** Media keys (play/pause, previous, next) control the device while connected */
@@ -117,9 +119,16 @@ export interface AppArt {
 }
 
 export interface ScanResult {
+  /** host:port to connect to over adb */
   host: string;
-  /** Reverse DNS name if the router provides one */
+  ip: string;
+  /** The TV's own name when it publishes one (Fire TV and Android TV do), else the router's name for it */
   name: string;
+  model: string;
+  kind: DeviceKind;
+  /** The adb port answers: connecting will work (after approval on the device) */
+  adb: boolean;
+  /** Already connected in StickPilot */
   connected: boolean;
 }
 
@@ -132,6 +141,11 @@ export interface StickPilotApi {
   /** Adds a Wi-Fi connection to a USB device, reading its IP address itself */
   enableWifi(serial: string): Promise<NetworkResult>;
   scanNetwork(): Promise<ScanResult[]>;
+  /**
+   * Forgets a device: disconnects its Wi-Fi connections and clears what StickPilot saved
+   * for it. A device still plugged in is hidden instead (it would reappear at once).
+   */
+  removeDevice(key: string, serials: string[]): Promise<void>;
   listApps(serial: string, refresh?: boolean): Promise<AppInfo[]>;
   /** Real app logos, fetched from the device once and cached */
   appArt(serial: string, pkgs: string[], refresh?: boolean): Promise<Record<string, AppArt>>;

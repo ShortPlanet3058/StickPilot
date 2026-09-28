@@ -8,6 +8,7 @@ const api: StickPilotApi = {
   forgetNetwork: (host) => ipcRenderer.invoke('devices:forgetNetwork', host),
   enableWifi: (serial) => ipcRenderer.invoke('devices:enableWifi', serial),
   scanNetwork: () => ipcRenderer.invoke('devices:scan'),
+  removeDevice: (key, serials) => ipcRenderer.invoke('devices:remove', key, serials),
   listApps: (serial, refresh = false) => ipcRenderer.invoke('apps:list', serial, refresh),
   appArt: (serial, pkgs, refresh = false) => ipcRenderer.invoke('apps:art', serial, pkgs, refresh),
   cachedAppArt: (pkgs) => ipcRenderer.invoke('apps:cachedArt', pkgs),

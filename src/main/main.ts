@@ -139,6 +139,26 @@ ipcMain.handle('devices:enableWifi', async (_e, serial: string) => {
   return result;
 });
 ipcMain.handle('devices:scan', () => devices.scanNetwork());
+ipcMain.handle('devices:remove', async (_e, key: string, serials: string[]) => {
+  if ((status.state === 'running' || status.state === 'connecting') && serials.includes(status.serial)) {
+    await session.stop();
+    setStatus({ state: 'idle' });
+  }
+  const s = getSettings();
+  const network = serials.filter((x) => x.includes(':'));
+  for (const host of network) await devices.disconnectNetwork(host);
+  const drop = <T>(rec: Record<string, T>, keys: string[]) => Object.fromEntries(Object.entries(rec).filter(([k]) => !keys.includes(k)));
+  // Still plugged in over USB: it would come straight back, so keep it out of the lists
+  const stillPresent = devices.list().some((d) => serials.includes(d.serial) && d.transport === 'usb');
+  updateSettings({
+    networkHosts: s.networkHosts.filter((h) => !network.includes(h)),
+    favoriteApps: drop(s.favoriteApps, [key]),
+    transportByDevice: drop(s.transportByDevice, [key]),
+    profileBySerial: drop(s.profileBySerial, serials),
+    lastSerial: s.lastSerial && serials.includes(s.lastSerial) ? undefined : s.lastSerial,
+    hiddenDevices: stillPresent ? [...new Set([...s.hiddenDevices, key])] : s.hiddenDevices.filter((h) => h !== key),
+  });
+});
 
 // ---- Apps
 

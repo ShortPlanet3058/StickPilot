@@ -5,7 +5,7 @@ import { icon } from './icons';
 import { bindKeyboard } from './keyboard';
 import { bindRemote, flashKey, isMac, layoutFor, MOD, renderRemote, triggerQuickSettings } from './remote';
 import { Video } from './video';
-import type { DeviceInfo, DeviceKind, StickPilotApi, ProfileSet, SessionMode, SessionStatus, Settings, Transport } from '../shared/types';
+import type { DeviceInfo, DeviceKind, ScanResult, StickPilotApi, ProfileSet, SessionMode, SessionStatus, Settings, Transport } from '../shared/types';
 
 declare global {
   interface Window { stickpilot: StickPilotApi }
@@ -51,6 +51,10 @@ const state = {
   autoConnectTried: false,
   /** Recording start time (ms), or 0 */
   recordingSince: 0,
+  /** Network discovery results, and whether a search is running */
+  discovered: [] as ScanResult[],
+  scanning: false,
+  discoveredOnce: false,
   remoteKind: null as DeviceKind | null,
 };
 
@@ -95,9 +99,11 @@ const subline = (d: DeviceInfo) => [via(d), d.state === 'unauthorized' ? 'Not au
 /** One physical device, reachable over one or more connections (USB, Wi-Fi) */
 interface DeviceGroup { key: string; conns: DeviceInfo[] }
 
-function groupDevices(list: DeviceInfo[]): DeviceGroup[] {
+function groupDevices(list: DeviceInfo[], includeHidden = false): DeviceGroup[] {
   const groups = new Map<string, DeviceGroup>();
+  const hidden = new Set(state.settings?.hiddenDevices ?? []);
   for (const d of list) {
+    if (!includeHidden && (hidden.has(d.hardwareId) || hidden.has(d.serial))) continue;
     const key = d.hardwareId || d.serial;
     if (!groups.has(key)) groups.set(key, { key, conns: [] });
     groups.get(key)!.conns.push(d);
@@ -174,8 +180,6 @@ function buildAddTile(): void {
       </div>
       <p class="help">Fire TV: Settings → My Fire TV → About → Network shows the IP address. ADB debugging must be on.</p>
       <p class="message" role="status"></p>
-      <button type="button" class="ghost scan-btn">${icon('refresh', 15)}<span>Find devices on this network</span></button>
-      <ul class="scan-results"></ul>
     </form>`;
   const form = addTile.querySelector<HTMLFormElement>('.add-form')!;
   const open = (on: boolean) => {
@@ -185,29 +189,6 @@ function buildAddTile(): void {
     if (on) addTile.querySelector<HTMLInputElement>('#add-host')!.focus();
   };
   addTile.querySelector('.add-open')!.addEventListener('click', () => open(true));
-  const scanBtn = addTile.querySelector<HTMLButtonElement>('.scan-btn')!;
-  const results = addTile.querySelector<HTMLElement>('.scan-results')!;
-  scanBtn.addEventListener('click', async () => {
-    scanBtn.disabled = true;
-    scanBtn.querySelector('span')!.textContent = 'Searching…';
-    results.innerHTML = '';
-    const found = await api.scanNetwork();
-    scanBtn.disabled = false;
-    scanBtn.querySelector('span')!.textContent = 'Search again';
-    results.innerHTML = found.length
-      ? found.map((f) => `<li><span class="scan-name">${esc(f.name || f.host.replace(/:5555$/, ''))}</span>`
-        + `<small>${esc(f.name ? f.host : 'adb port open')}</small>`
-        + (f.connected ? '<span class="pill ready">Added</span>' : `<button type="button" data-scan-host="${esc(f.host)}">Connect</button>`)
-        + '</li>').join('')
-      : '<li class="muted">No devices answered. ADB debugging must be on, on the same network.</li>';
-  });
-  results.addEventListener('click', (e) => {
-    const host = (e.target as HTMLElement).closest<HTMLElement>('[data-scan-host]')?.dataset.scanHost;
-    if (!host) return;
-    addTile.querySelector<HTMLInputElement>('#add-host')!.value = host;
-    form.requestSubmit();
-  });
-  addTile.querySelector('.add-close')!.addEventListener('click', () => open(false));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = addTile.querySelector<HTMLInputElement>('#add-host')!;
@@ -254,13 +235,11 @@ function deviceCard(g: DeviceGroup): string {
         ? `<button class="link" data-wifi="${esc(d.serial)}" title="Connect this device over Wi-Fi too, so it works without the cable">Set up Wi-Fi</button>` : ''
     }</p>`;
 
-  const net = g.conns.find((c) => c.transport === 'network');
-  const forget = net
-    ? `<button class="icon-btn forget" data-forget="${esc(net.serial)}" title="Forget the Wi-Fi connection">${icon('close', 15)}</button>` : '';
+  const more = `<button class="icon-btn more" data-more="${esc(g.key)}" title="More" aria-haspopup="menu">${icon('more', 18)}</button>`;
   const detail = d.state === 'unauthorized' ? 'Not authorized yet' : [d.osLabel, d.model && d.model !== d.name ? d.model : ''].filter(Boolean).join(' · ');
   return `<article class="dcard${live ? ' live' : ''}">
       <div class="dcard-top"><span class="dcard-icon">${icon(kindIcon(d.kind), 22)}</span>
-        <span class="pill ${pill.cls}">${pill.text}</span>${forget}</div>
+        <span class="dcard-top-end"><span class="pill ${pill.cls}">${pill.text}</span>${more}</span></div>
       <h3>${esc(d.name)}</h3>
       <p class="dcard-detail">${esc(detail)}</p>
       <div class="dcard-conn">${picker}</div>
@@ -270,11 +249,33 @@ function deviceCard(g: DeviceGroup): string {
 
 function missingCard(host: string): string {
   return `<article class="dcard dim">
-      <div class="dcard-top"><span class="dcard-icon">${icon('wifi', 22)}</span><span class="pill">Not reachable</span>
-        <button class="icon-btn forget" data-forget="${esc(host)}" title="Forget this device">${icon('close', 15)}</button></div>
+      <div class="dcard-top"><span class="dcard-icon">${icon('wifi', 22)}</span>
+        <span class="dcard-top-end"><span class="pill">Not reachable</span>
+        <button class="icon-btn more" data-more-host="${esc(host)}" title="More" aria-haspopup="menu">${icon('more', 18)}</button></span></div>
       <h3>${esc(host)}</h3>
       <p class="dcard-detail">Saved Wi-Fi device</p>
       <div class="dcard-foot"><button data-retry="${esc(host)}">Try again</button></div>
+    </article>`;
+}
+
+/** Discovered hosts not already in the list (by address, or by name for a TV known over USB) */
+function discoveredFor(tab: Tab): ScanResult[] {
+  const names = new Set(state.devices.map((d) => d.name.toLowerCase()));
+  const saved = new Set(state.settings?.networkHosts ?? []);
+  return state.discovered.filter((f) => !f.connected && !saved.has(f.host) && !names.has(f.name.toLowerCase())
+    && (tab === 'tv' ? f.kind === 'tv' : tab === 'firetv' ? f.kind !== 'tv' : false));
+}
+
+function discoveredCard(f: ScanResult): string {
+  const foot = f.adb
+    ? `<button class="primary" data-join="${esc(f.host)}">Connect</button>`
+    : '<p class="dcard-help">Turn on ADB debugging on this TV to connect (Settings → My Fire TV → Developer options).</p>';
+  return `<article class="dcard found">
+      <div class="dcard-top"><span class="dcard-icon">${icon(f.kind === 'unknown' ? 'wifi' : 'tv', 22)}</span>
+        <span class="pill ${f.adb ? 'ready' : 'warn'}">${f.adb ? 'Found' : 'ADB off'}</span></div>
+      <h3>${esc(f.name || f.ip)}</h3>
+      <p class="dcard-detail">${esc([f.ip, f.model || (f.kind === 'unknown' ? 'Android device' : '')].filter(Boolean).join(' · '))}</p>
+      <div class="dcard-foot">${foot}</div>
     </article>`;
 }
 
@@ -305,8 +306,17 @@ function renderHome(): void {
       </div>`;
   }
   html += `<div class="grid" id="device-grid">${mine.map(deviceCard).join('')}${missing.map(missingCard).join('')}</div>`;
+  const found = discoveredFor(tab);
+  if (found.length) html += `<h2 class="section-title">On your network</h2><div class="grid">${found.map(discoveredCard).join('')}</div>`;
+  const hiddenCount = groupDevices(state.devices, true).length - groups.length;
+  if (hiddenCount > 0) {
+    html += `<p class="hidden-note">${hiddenCount} hidden device${hiddenCount > 1 ? 's' : ''} · <button class="link" data-unhide>Show</button></p>`;
+  }
   $('home-content').innerHTML = html;
   $('device-grid').appendChild(addTile); // moved, not recreated: keeps what is typed in it
+  const btn = $<HTMLButtonElement>('btn-discover');
+  btn.disabled = state.scanning;
+  btn.innerHTML = state.scanning ? '<span class="spinner small"></span><span>Searching…</span>' : `${icon('search', 16)}<span>Discover</span>`;
 }
 
 // ---------- Player & remote view ----------
@@ -371,7 +381,8 @@ function renderToolbars(): void {
 }
 
 function renderSwitchMenu(): void {
-  const items = state.devices.map((d) => {
+  const visible = new Set(groupDevices(state.devices).flatMap((g) => g.conns.map((c) => c.serial)));
+  const items = state.devices.filter((d) => visible.has(d.serial) || d.serial === state.current).map((d) => {
     const pill = stateLabel(d);
     const current = d.serial === state.current;
     return `<button role="menuitem" class="menu-item${current ? ' current' : ''}" data-switch="${esc(d.serial)}" ${d.state !== 'device' ? 'disabled' : ''}>
@@ -588,6 +599,77 @@ async function forget(host: string): Promise<void> {
 async function retry(host: string): Promise<void> {
   await api.connectNetwork(host);
   state.settings = await api.getSettings();
+  render();
+}
+
+async function discover(manual: boolean): Promise<void> {
+  if (state.scanning) return;
+  state.scanning = true;
+  renderHome();
+  try {
+    state.discovered = await api.scanNetwork();
+  } finally {
+    state.scanning = false;
+    state.discoveredOnce = true;
+  }
+  if (manual) {
+    const n = discoveredFor(currentTab()).length;
+    toast(n ? `Found ${n} new device${n > 1 ? 's' : ''} on your network.` : 'No new devices found on your network.', { kind: n ? 'ok' : 'info' });
+  }
+  render();
+}
+
+async function join(host: string): Promise<void> {
+  toast(`Connecting to ${host}… If the TV asks, allow USB debugging.`, { ms: 4000 });
+  const result = await api.connectNetwork(host);
+  state.settings = await api.getSettings();
+  toast(result.message, { kind: result.ok ? 'ok' : 'error' });
+  render();
+}
+
+/** Items marked danger need a second click ("Click again to …") before they run */
+function openCardMenu(anchor: HTMLElement, items: { label: string; danger?: boolean; confirm?: string; run: () => void }[]): void {
+  const menu = $('card-menu');
+  const armed = new Set<number>();
+  const draw = () => {
+    menu.innerHTML = items.map((it, i) => `<button role="menuitem" class="menu-item${it.danger ? ' danger' : ''}${armed.has(i) ? ' armed' : ''}" data-i="${i}"><span class="menu-text"><span>${esc(armed.has(i) ? it.confirm ?? 'Click again to confirm' : it.label)}</span></span></button>`).join('');
+  };
+  draw();
+  const r = anchor.getBoundingClientRect();
+  menu.style.top = `${r.bottom + 4}px`;
+  menu.style.left = `${Math.max(8, Math.min(r.right - 240, window.innerWidth - 248))}px`;
+  menu.hidden = false;
+  menu.onclick = (e) => {
+    const i = Number((e.target as HTMLElement).closest<HTMLElement>('[data-i]')?.dataset.i);
+    if (Number.isNaN(i)) return;
+    if (items[i].danger && !armed.has(i)) { armed.add(i); draw(); return; }
+    menu.hidden = true;
+    items[i].run();
+  };
+}
+
+function deviceMenu(anchor: HTMLElement, key: string): void {
+  const g = groupDevices(state.devices).find((x) => x.key === key);
+  if (!g) return;
+  const d = primaryConn(g);
+  const net = g.conns.find((c) => c.transport === 'network');
+  const usb = g.conns.some((c) => c.transport === 'usb');
+  const items: { label: string; danger?: boolean; confirm?: string; run: () => void }[] = [];
+  if (net && usb) items.push({ label: 'Forget Wi-Fi connection', run: () => void forget(net.serial) });
+  items.push({
+    label: usb ? 'Remove and hide from the list' : 'Remove from StickPilot',
+    danger: true,
+    confirm: 'Click again to remove (clears its favorites)',
+    run: () => void removeDevice(g, d.name, usb),
+  });
+  openCardMenu(anchor, items);
+}
+
+async function removeDevice(g: DeviceGroup, name: string, usb: boolean): Promise<void> {
+  await api.removeDevice(g.key, g.conns.map((c) => c.serial));
+  state.settings = await api.getSettings();
+  if (g.conns.some((c) => c.serial === state.current)) state.current = null;
+  toast(usb ? `${name} is hidden. Unplug it, or use Show at the bottom to bring it back.` : `${name} was removed.`, { kind: 'ok', ms: 6000 });
   render();
 }
 
@@ -820,10 +902,23 @@ function wire(): void {
     if (t.dataset.forget) void forget(t.dataset.forget);
     if (t.dataset.retry) void retry(t.dataset.retry);
     if (t.dataset.wifi) void setupWifi(t, t.dataset.wifi);
+    if (t.dataset.more) deviceMenu(t, t.dataset.more);
+    if (t.dataset.moreHost) {
+      const host = t.dataset.moreHost;
+      openCardMenu(t, [{ label: 'Remove from StickPilot', danger: true, confirm: 'Click again to remove', run: () => void forget(host) }]);
+    }
+    if (t.dataset.join) void join(t.dataset.join);
+    if (t.dataset.unhide !== undefined) void saveSetting({ hiddenDevices: [] });
     if (t.dataset.transport && t.dataset.group && state.settings) {
       void saveSetting({ transportByDevice: { ...state.settings.transportByDevice, [t.dataset.group]: t.dataset.transport as Transport } });
     }
   });
+  $('btn-discover').addEventListener('click', () => void discover(true));
+  document.addEventListener('mousedown', (e) => {
+    const t = e.target as HTMLElement;
+    if (!$('card-menu').hidden && !t.closest('#card-menu') && !t.closest('[data-more], [data-more-host]')) $('card-menu').hidden = true;
+  });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('card-menu').hidden = true; });
   $<HTMLInputElement>('auto-connect').addEventListener('change', (e) =>
     saveSetting({ autoConnect: (e.target as HTMLInputElement).checked }));
 
@@ -953,6 +1048,8 @@ async function init(): Promise<void> {
   for (const d of state.devices) if (d.state === 'device') void loadProfiles(d.serial);
   render();
   maybeAutoConnect();
+  // One quiet search after launch; the Discover button repeats it
+  setTimeout(() => void discover(false), 1500);
 }
 
 void init();

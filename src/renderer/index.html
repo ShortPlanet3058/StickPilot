@@ -11,11 +11,14 @@
   <section id="home" class="view" aria-label="Devices">
     <header class="home-head drag">
       <div class="brand"><span id="brand-icon"></span><span>StickPilot</span></div>
+      <div class="home-actions no-drag">
+      <button id="btn-discover" class="ghost" title="Look for TVs and Android devices on this network"></button>
       <label class="toggle no-drag" title="Open the last used device as soon as it is available">
         <input type="checkbox" id="auto-connect">
         <span class="toggle-track" aria-hidden="true"></span>
         <span>Connect automatically</span>
       </label>
+      </div>
     </header>
     <nav id="home-tabs" class="tabs" role="tablist" aria-label="Device type"></nav>
     <div class="home-body">
@@ -105,6 +108,7 @@
   </aside>
 
   <div id="switch-menu" class="menu" role="menu" hidden></div>
+  <div id="card-menu" class="menu card-menu" role="menu" hidden></div>
   <div id="apps-panel" class="sheet" hidden></div>
   <div id="device-panel" class="sheet" hidden></div>
   <div id="drop-zone" class="drop-zone" hidden><div class="drop-card"><span id="drop-icon"></span><p id="drop-text"></p></div></div>
