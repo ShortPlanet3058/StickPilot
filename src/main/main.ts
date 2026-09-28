@@ -9,6 +9,7 @@ import { flushSettings, getSettings, updateSettings } from './settings';
 import { appArt, cachedAppArt } from './appIcons';
 import { adbPath } from './paths';
 import { Recorder } from './recorder';
+import { DoubleTap } from './doubleTap';
 import { TrayRemote } from './tray';
 import { Typer } from './typing';
 import { adb } from './adb';
@@ -212,6 +213,9 @@ ipcMain.handle('session:connectRemote', async (_e, serial?: string) => {
   await start(target, getSettings().profileBySerial[target] ?? '', 'remote');
 });
 ipcMain.on('window:showMain', () => showMain());
+ipcMain.on('system:openAccessibility', () => {
+  void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
+});
 
 // ---- Screenshots and recordings
 
@@ -387,12 +391,28 @@ const tray = new TrayRemote({
   quit: () => app.quit(),
   tap: (code) => { if (status.state !== 'running') return false; session.tap(code); return true; },
   mediaKeysEnabled: () => getSettings().mediaKeys,
+  doubleShiftEnabled: () => getSettings().doubleShift,
+  setDoubleShift: (on) => {
+    updateSettings({ doubleShift: on });
+    applyDoubleShift(true);
+  },
   setMediaKeys: (on) => {
     updateSettings({ mediaKeys: on });
     const notice = tray.updateMediaKeys(status.state === 'running');
     if (notice) sendAll('notice', notice);
   },
 });
+
+const doubleShift = new DoubleTap(() => tray.toggle());
+
+/** Starts or stops the Right Shift shortcut to match the setting; explains when it can't start */
+function applyDoubleShift(explain: boolean): void {
+  if (!getSettings().doubleShift) { doubleShift.stop(); return; }
+  const problem = doubleShift.start();
+  if (problem && explain) {
+    send('notice', { message: problem, action: process.platform === 'darwin' && /Accessibility/.test(problem) ? 'accessibility' : undefined });
+  }
+}
 
 function showMain(): void {
   if (!win || win.isDestroyed()) createWindow();
@@ -409,6 +429,8 @@ app.whenReady().then(async () => {
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(assetPath('icon.png'));
   createWindow();
   tray.create();
+  // The notice would arrive before the window can show it, so wait for it to load
+  win?.webContents.once('did-finish-load', () => applyDoubleShift(true));
   await devices.start();
   // Reconnect remembered network devices quietly; failures just leave them absent
   for (const host of getSettings().networkHosts) void devices.connectNetwork(host);
@@ -422,6 +444,7 @@ app.on('will-quit', (e) => {
     return;
   }
   devices.stop();
+  doubleShift.stop();
   tray.destroy();
   flushSettings();
 });

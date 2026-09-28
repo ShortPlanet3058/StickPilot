@@ -18,6 +18,7 @@ ap.add_argument("fps", type=int); ap.add_argument("size", type=int); ap.add_argu
 ap.add_argument("--secs", type=int, default=60); ap.add_argument("--ui", action="store_true")
 ap.add_argument("--opts", default="")
 ap.add_argument("--read", action="store_true", help="bursts of 4 arrow keys, then 8 s still")
+ap.add_argument("--audio", action="store_true", help="also stream the device's sound (Opus), like StickPilot's sound option")
 a = ap.parse_args()
 WARMUP = 8
 bps = int(float(a.br.rstrip("Mm")) * 1_000_000)
@@ -31,7 +32,8 @@ adb("push", f"{D}/scrcpy-server", "/data/local/tmp/scrcpy-server.jar")
 adb("forward", f"tcp:{port}", f"localabstract:scrcpy_{scid:08x}")
 cmd = [ADB, "shell", "CLASSPATH=/data/local/tmp/scrcpy-server.jar", "app_process", "/",
        "com.genymobile.scrcpy.Server", "4.1", f"scid={scid:08x}", "log_level=info",
-       "tunnel_forward=true", "audio=false", "control=false", "video_codec=h264",
+       "tunnel_forward=true", f"audio={'true' if a.audio else 'false'}", "audio_codec=opus", "audio_bit_rate=128000",
+       "control=false", "video_codec=h264",
        f"max_size={a.size}", f"max_fps={a.fps}", f"video_bit_rate={bps}",
        "send_device_meta=false", "send_stream_meta=false", "send_frame_meta=true",
        "cleanup=false", "power_on=false"]
@@ -57,6 +59,21 @@ for _ in range(100):  # adb forward accepts before the server listens: wait for 
         sock = None; time.sleep(0.1)
 if not sock:
     server.kill(); print("could not connect:", server.stdout.read()[-500:]); sys.exit(1)
+
+audio_bytes = [0]
+if a.audio:
+    # Sockets open in the server's order: video, then audio. Drain audio in the background.
+    import threading
+    asock = socket.create_connection(("127.0.0.1", port))
+    def drain():
+        try:
+            while True:
+                chunk = asock.recv(65536)
+                if not chunk: break
+                audio_bytes[0] += len(chunk)
+        except OSError:
+            pass
+    threading.Thread(target=drain, daemon=True).start()
 
 keys = None
 if a.read:
@@ -86,7 +103,7 @@ finally:
     sock.close(); server.kill(); adb("forward", "--remove", f"tcp:{port}")
     time.sleep(2)
 
-tag = f"{a.fps}_{a.size}_{a.br}{'_ui' if a.ui else ''}{'_read' if a.read else ''}{'_' + a.opts.replace(':', '-').replace(',', '+') if a.opts else ''}"
+tag = f"{a.fps}_{a.size}_{a.br}{'_audio' if a.audio else ''}{'_ui' if a.ui else ''}{'_read' if a.read else ''}{'_' + a.opts.replace(':', '-').replace(',', '+') if a.opts else ''}"
 with open(f"runs/probe_{tag}_{int(time.time())}.csv", "w") as fh:
     csv.writer(fh).writerows(frames)
 
@@ -111,4 +128,4 @@ if motion:
     out += f" | motion gap p50={q(motion,.5):3.0f} p90={q(motion,.9):3.0f} ms (~{1000/q(motion,.5):.0f} fps)"
 if not (a.ui or a.read):
     out += f" | fps avg={st.mean(nz):.1f} within2={100*ok/len(nz):.0f}%"
-print(out + f" | {mbps:.1f} Mb/s")
+print(out + f" | {mbps:.1f} Mb/s" + (f" | sound {audio_bytes[0] * 8 / (a.secs + WARMUP) / 1000:.0f} kb/s" if a.audio else ""))

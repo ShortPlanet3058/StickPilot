@@ -15,6 +15,8 @@ export interface TrayHooks {
   tap(keycode: number): boolean;
   mediaKeysEnabled(): boolean;
   setMediaKeys(on: boolean): void;
+  doubleShiftEnabled(): boolean;
+  setDoubleShift(on: boolean): void;
 }
 
 const MEDIA_KEYS: [string, number][] = [
@@ -69,6 +71,12 @@ export class TrayRemote {
         type: 'checkbox',
         checked: this.hooks.mediaKeysEnabled(),
         click: (item) => this.hooks.setMediaKeys(item.checked),
+      },
+      {
+        label: 'Double-tap Right Shift opens this remote',
+        type: 'checkbox',
+        checked: this.hooks.doubleShiftEnabled(),
+        click: (item) => this.hooks.setDoubleShift(item.checked),
       },
       { type: 'separator' },
       { label: 'Quit', click: () => this.hooks.quit() },

@@ -47,7 +47,8 @@ const api: StickPilotApi = {
   pushFile: (serial, path) => ipcRenderer.invoke('files:push', serial, path),
   deviceInfo: (serial) => ipcRenderer.invoke('device:info', serial),
   devicePower: (serial, action) => ipcRenderer.invoke('device:power', serial, action),
-  onNotice: (cb) => { ipcRenderer.on('notice', (_e, m) => cb(m)); },
+  onNotice: (cb) => { ipcRenderer.on('notice', (_e, n) => cb(typeof n === 'string' ? { message: n } : n)); },
+  openAccessibilitySettings: () => ipcRenderer.send('system:openAccessibility'),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
 };

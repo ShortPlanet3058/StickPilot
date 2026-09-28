@@ -9,7 +9,8 @@ for (const f of ['index.html', 'tray.html', 'styles.css', 'logo.png']) cpSync(`s
 
 const common = { bundle: true, sourcemap: true, logLevel: 'info', target: 'es2022' };
 const configs = [
-  { ...common, entryPoints: ['src/main/main.ts'], outfile: 'dist/main/main.js', platform: 'node', format: 'cjs', external: ['electron'] },
+  // uiohook-napi is a native module: loaded from node_modules at runtime, not bundled
+  { ...common, entryPoints: ['src/main/main.ts'], outfile: 'dist/main/main.js', platform: 'node', format: 'cjs', external: ['electron', 'uiohook-napi'] },
   { ...common, entryPoints: ['src/preload/preload.ts'], outfile: 'dist/preload/preload.js', platform: 'node', format: 'cjs', external: ['electron'] },
   { ...common, entryPoints: ['src/renderer/app.ts'], outfile: 'dist/renderer/app.js', platform: 'browser', format: 'iife' },
   { ...common, entryPoints: ['src/renderer/tray.ts'], outfile: 'dist/renderer/tray.js', platform: 'browser', format: 'iife' },

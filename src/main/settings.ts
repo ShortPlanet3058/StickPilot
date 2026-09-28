@@ -16,6 +16,7 @@ const DEFAULTS: Settings = {
   hiddenDevices: [],
   audioEnabled: false,
   mediaKeys: false,
+  doubleShift: true,
 };
 
 const file = () => path.join(app.getPath('userData'), 'settings.json');

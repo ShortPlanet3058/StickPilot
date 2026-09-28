@@ -1048,7 +1048,11 @@ function wire(): void {
     else if (wasLive !== s.serial || wasMode !== 'mirror') video.hasFrame = false;
     render();
   });
-  api.onNotice((m) => toast(m, { kind: 'info', ms: 9000 }));
+  api.onNotice((n) => toast(n.message, {
+    kind: 'info',
+    ms: n.action ? 20000 : 9000,
+    action: n.action === 'accessibility' ? { label: 'Open Settings', run: () => api.openAccessibilitySettings() } : undefined,
+  }));
   api.onFullscreen((on) => {
     state.fullscreen = on;
     document.body.classList.toggle('fullscreen', on);

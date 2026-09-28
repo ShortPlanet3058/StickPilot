@@ -73,6 +73,8 @@ export interface Settings {
   audioEnabled: boolean;
   /** Media keys (play/pause, previous, next) control the device while connected */
   mediaKeys: boolean;
+  /** Double-tapping Right Shift anywhere opens the menu-bar remote */
+  doubleShift: boolean;
 }
 
 export interface VideoPacket {
@@ -200,8 +202,10 @@ export interface StickPilotApi {
   devicePower(serial: string, action: 'sleep' | 'wake' | 'reboot'): Promise<void>;
   /** Copies a file or folder to the device's Download folder */
   pushFile(serial: string, path: string): Promise<{ ok: boolean; message: string }>;
-  /** Messages from the main process to show as notices (e.g. media key permission) */
-  onNotice(cb: (message: string) => void): void;
+  /** Messages from the main process to show as notices; 'accessibility' adds an Open Settings button */
+  onNotice(cb: (notice: { message: string; action?: 'accessibility' }) => void): void;
+  /** Opens macOS's Privacy & Security → Accessibility page (the user grants access there) */
+  openAccessibilitySettings(): void;
   getSettings(): Promise<Settings>;
   setSettings(patch: Partial<Settings>): Promise<void>;
 }
