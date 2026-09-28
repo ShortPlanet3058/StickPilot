@@ -70,10 +70,11 @@
       "target": "dmg",
       "icon": "assets/StickPilot.icns",
       "category": "public.app-category.utilities",
-      "identity": null,
+      "identity": "-",
       "extendInfo": {
         "NSLocalNetworkUsageDescription": "StickPilot connects to your TV over Wi-Fi and looks for TVs on your local network."
-      }
+      },
+      "hardenedRuntime": false
     },
     "dmg": {
       "title": "StickPilot ${version}",

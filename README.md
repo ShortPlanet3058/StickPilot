@@ -33,8 +33,11 @@ npm start           # builds and opens the app
 
 `npm run dist:mac` builds `release/StickPilot-<version>-mac-x64.dmg` (Intel). adb, the scrcpy
 server, the icon helper and the icons are bundled in the app's Resources, so it doesn't need a local
-scrcpy download. The app isn't signed with an Apple Developer ID: a copy downloaded from elsewhere
-needs right-click → Open the first time.
+scrcpy download. The app is ad-hoc signed (no Apple Developer ID): a copy downloaded from elsewhere
+needs right-click → Open the first time. The signature gives macOS a code identity to attach
+permissions to (Accessibility for the Right Shift shortcut and media keys, Local Network); an ad-hoc
+signature changes with every build, so after installing a new build those permissions may need to be
+switched off and on again (or removed with − and added back).
 
 ### Driving the app from scripts
 
