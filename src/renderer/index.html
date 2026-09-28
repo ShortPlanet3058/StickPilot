@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <title>Fire TV</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Device screen: pick, add and manage devices -->
+  <section id="home" class="view" aria-label="Devices">
+    <header class="home-head drag">
+      <div class="brand"><span id="brand-icon"></span><span>Fire TV</span></div>
+      <label class="toggle no-drag" title="Connect to the last used device as soon as it is available">
+        <input type="checkbox" id="auto-connect">
+        <span class="toggle-track" aria-hidden="true"></span>
+        <span>Connect automatically</span>
+      </label>
+    </header>
+    <div class="home-body">
+      <div id="home-content" class="home-content"></div>
+    </div>
+  </section>
+
+  <!-- Player: picture + remote -->
+  <section id="player" class="view" aria-label="Player" hidden>
+    <header id="toolbar" class="toolbar drag">
+      <button id="btn-home" class="ghost" title="All devices"></button>
+      <div class="switcher no-drag">
+        <button id="btn-switch" class="switch-btn" aria-haspopup="menu" aria-expanded="false"></button>
+        <div id="switch-menu" class="menu" role="menu" hidden></div>
+      </div>
+      <span id="title-status" class="muted status-text"></span>
+      <div class="toolbar-spacer"></div>
+      <div id="profile-picker" class="segmented no-drag" role="radiogroup" aria-label="Quality profile"></div>
+      <div class="toolbar-actions no-drag">
+        <button id="btn-stats" class="icon-btn" aria-pressed="false"></button>
+        <button id="btn-fullscreen" class="icon-btn"></button>
+        <button id="btn-remote" class="icon-btn" aria-pressed="true"></button>
+        <button id="btn-connect"></button>
+      </div>
+    </header>
+
+    <div class="player-body">
+      <div id="stage" tabindex="-1" aria-label="Device screen">
+        <canvas id="screen" hidden></canvas>
+        <div id="overlay" class="overlay"></div>
+        <pre id="stats" class="stats" hidden></pre>
+        <div id="fs-bar" class="fs-bar">
+          <span id="fs-name"></span>
+          <button id="fs-exit" class="fs-exit"></button>
+        </div>
+      </div>
+
+      <aside id="remote" aria-label="Remote">
+        <div id="remote-buttons" class="remote-buttons"></div>
+        <form id="type-form" class="type-form">
+          <label for="type-text">Send text to the TV</label>
+          <div class="field-row">
+            <input id="type-text" placeholder="Paste or type, then Enter" autocomplete="off" spellcheck="false">
+            <button type="submit" class="icon-btn" id="type-send" aria-label="Send text"></button>
+          </div>
+          <p class="help">You can also just start typing while the picture is selected.</p>
+        </form>
+        <details class="shortcuts-wrap">
+          <summary>Keyboard shortcuts</summary>
+          <dl id="shortcuts" class="shortcuts"></dl>
+        </details>
+      </aside>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

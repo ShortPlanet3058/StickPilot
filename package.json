@@ -1,0 +1,21 @@
+{
+  "name": "firetv",
+  "version": "0.1.0",
+  "description": "Mirror and control a Fire TV from your computer (scrcpy-based)",
+  "main": "dist/main/main.js",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "start": "node scripts/build.mjs && electron .",
+    "debug": "node scripts/build.mjs && FIRETV_DEBUG=1 electron .",
+    "typecheck": "tsc",
+    "vendor": "node scripts/vendor.mjs"
+  },
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "electron": "^44.4.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  }
+}
