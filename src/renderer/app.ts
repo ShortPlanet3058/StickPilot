@@ -1,3 +1,4 @@
+import { AppsPanel, avatar, paintAvatars } from './apps';
 import { icon } from './icons';
 import { bindKeyboard } from './keyboard';
 import { bindRemote, flashKey, isMac, layoutFor, MOD, renderRemote, triggerQuickSettings } from './remote';
@@ -55,6 +56,10 @@ const liveMode = (): SessionMode | null => (state.status.state === 'running' || 
 const isLive = (serial: string) => liveSerial() === serial;
 const isRunning = () => state.status.state === 'running' && state.status.serial === state.current;
 const missingNetworkHosts = () => (state.settings?.networkHosts ?? []).filter((h) => !device(h));
+
+/** Favorites are per physical device, so USB and Wi-Fi share them */
+const deviceKey = (serial: string | null) => device(serial)?.hardwareId || serial || '';
+const favoritesFor = (serial: string | null) => state.settings?.favoriteApps[deviceKey(serial)] ?? [];
 
 function profileIdFor(serial: string): string {
   const set = state.profileSets.get(serial);
@@ -418,7 +423,23 @@ function statusCard(mode: SessionMode): string {
   return card({ icon: kindIcon(d.kind), title: 'Disconnected', meta: `${esc(d.name)} · ${meta}`, actions: `${backToDevices}${again}` });
 }
 
+function renderFavorites(): void {
+  const favs = favoritesFor(state.current).slice(0, 3);
+  const html = favs.map((pkg) => {
+    const app = apps.byPkg(pkg) ?? { pkg, name: pkg.split('.').pop() ?? pkg, system: false };
+    return `<button class="fav" data-fav="${esc(pkg)}" title="Open ${esc(app.name)}">${avatar(app, 28)}<span>${esc(app.name)}</span></button>`;
+  }).join('') + `<button class="fav all" data-apps title="All apps (${MOD}A)">${icon('grid', 18)}<span>${favs.length ? 'All apps' : 'Apps'}</span></button>`;
+  const row = $('fav-apps');
+  if (row.dataset.html !== html) {
+    row.dataset.html = html;
+    row.innerHTML = html;
+    row.classList.toggle('empty', !favs.length);
+    paintAvatars(row);
+  }
+}
+
 function renderRemotePanel(): void {
+  renderFavorites();
   const kind = device(state.current)?.kind ?? 'firetv';
   if (kind === state.remoteKind) return;
   state.remoteKind = kind;
@@ -574,6 +595,25 @@ function toggleConnection(): void {
   else void connect(serial, state.view === 'remote' ? 'remote' : 'mirror');
 }
 
+// ---------- Apps ----------
+
+const apps = new AppsPanel($('apps-panel'), api, {
+  serial: () => (isRunning() ? state.current : null),
+  favorites: () => favoritesFor(state.current),
+  setFavorites: (pkgs) => {
+    if (!state.settings) return;
+    void saveSetting({ favoriteApps: { ...state.settings.favoriteApps, [deviceKey(state.current)]: pkgs } });
+  },
+  toast: (m, kind) => toast(m, { kind }),
+  done: () => focusTarget().focus(),
+});
+apps.onLoaded = () => renderFavorites();
+
+function toggleApps(): void {
+  if (!isRunning()) return;
+  apps.toggle();
+}
+
 // ---------- Video & fullscreen ----------
 
 const video = new Video($<HTMLCanvasElement>('screen'), api);
@@ -604,6 +644,8 @@ function wire(): void {
     b.addEventListener('click', goHome);
   }
   const titled = (id: string, ico: string, title: string) => { $(id).innerHTML = icon(ico); $(id).title = title; };
+  titled('btn-apps', 'grid', `Apps (${MOD}A)`);
+  titled('btn-apps-compact', 'grid', `Apps (${MOD}A)`);
   titled('btn-remote-only', 'remote', 'Remote only: stop the picture, keep the remote');
   titled('btn-stats', 'stats', `Latency stats (${MOD}I)`);
   titled('btn-fullscreen', 'fullscreen', `Fullscreen (${MOD}F)`);
@@ -662,6 +704,14 @@ function wire(): void {
   $('btn-remote').addEventListener('click', toggleRemote);
   $('btn-fullscreen').addEventListener('click', toggleFullscreen);
   $('fs-exit').addEventListener('click', () => api.toggleFullscreen());
+  $('btn-apps').addEventListener('click', toggleApps);
+  $('btn-apps-compact').addEventListener('click', toggleApps);
+  $('fav-apps').addEventListener('click', (e) => {
+    const t = (e.target as HTMLElement).closest<HTMLElement>('button');
+    if (!t || !isRunning()) return;
+    if (t.dataset.apps !== undefined) toggleApps();
+    else if (t.dataset.fav) void apps.launch(t.dataset.fav);
+  });
   $('btn-remote-only').addEventListener('click', () => { if (state.current) void connect(state.current, 'remote'); });
   $('btn-show-screen').addEventListener('click', () => { if (state.current) void connect(state.current, 'mirror'); });
   $('btn-pin').addEventListener('click', () => {
@@ -692,12 +742,13 @@ function wire(): void {
 
   bindKeyboard(api, {
     active: () => state.view !== 'home' && isRunning(),
-    menuOpen: () => state.menuOpen,
+    menuOpen: () => state.menuOpen || apps.isOpen,
     flash: (code, down) => flashKey($('remote-buttons'), code, down),
     toggleFullscreen,
     toggleStats,
     toggleRemote,
     quickSettings,
+    toggleApps,
   });
   $('stage').addEventListener('mousedown', () => $('stage').focus());
   $('stage').addEventListener('mousemove', showFsBar);
@@ -713,6 +764,8 @@ function wire(): void {
     const wasLive = liveSerial();
     const wasMode = liveMode();
     state.status = s;
+    if (s.state === 'running' && favoritesFor(s.serial).length) void apps.load(false);
+    if (s.state !== 'running') apps.close();
     if (s.state !== 'running' || s.mode !== 'mirror') video.clear();
     else if (wasLive !== s.serial || wasMode !== 'mirror') video.hasFrame = false;
     render();

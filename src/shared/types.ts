@@ -65,6 +65,8 @@ export interface Settings {
   homeTab: DeviceKind;
   /** Keep the compact remote window above other windows */
   remoteOnTop: boolean;
+  /** Pinned apps (package names) per physical device (hardwareId) */
+  favoriteApps: Record<string, string[]>;
 }
 
 export interface VideoPacket {
@@ -78,6 +80,13 @@ export interface NetworkResult {
   ok: boolean;
   message: string;
   serial?: string;
+}
+
+export interface AppInfo {
+  name: string;
+  pkg: string;
+  /** Preinstalled with the system (as opposed to installed by the user) */
+  system: boolean;
 }
 
 export interface ScanResult {
@@ -96,6 +105,11 @@ export interface FireTvApi {
   /** Adds a Wi-Fi connection to a USB device, reading its IP address itself */
   enableWifi(serial: string): Promise<NetworkResult>;
   scanNetwork(): Promise<ScanResult[]>;
+  listApps(serial: string, refresh?: boolean): Promise<AppInfo[]>;
+  launchApp(serial: string, pkg: string): Promise<boolean>;
+  forceStopApp(serial: string, pkg: string): Promise<void>;
+  /** Package of the app in front on the device, if any */
+  currentApp(serial: string): Promise<string | null>;
   profilesFor(serial: string): Promise<ProfileSet>;
   start(serial: string, profileId: string, mode: SessionMode): Promise<void>;
   stop(): Promise<void>;

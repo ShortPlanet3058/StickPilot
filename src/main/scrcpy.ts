@@ -12,7 +12,7 @@ import { EventEmitter } from 'events';
 import net from 'net';
 import { adb, spawnAdb } from './adb';
 import { serverPath, SERVER_VERSION } from './paths';
-import type { Profile } from '../shared/types';
+import type { AppInfo, Profile } from '../shared/types';
 
 const DEVICE_JAR = '/data/local/tmp/firetv-scrcpy-server.jar';
 const FLAG_CONFIG = 1n << 62n;
@@ -38,6 +38,19 @@ export async function detectEncoder(serial: string): Promise<'hardware' | 'softw
   const out = await adb(serverArgs(scid, ['list_encoders=true', 'audio=false']), { serial, timeout: 15000 });
   const h264 = out.split('\n').filter((l) => /--video-codec=h264/.test(l));
   return h264.some((l) => /\((hw|hybrid)\)/.test(l)) ? 'hardware' : 'software';
+}
+
+/** Installed apps with their display names, via the server's list_apps (the server knows labels) */
+export async function listApps(serial: string): Promise<AppInfo[]> {
+  await pushServer(serial);
+  const out = await adb(serverArgs(randomScid(), ['list_apps=true']), { serial, timeout: 30000 });
+  const apps: AppInfo[] = [];
+  for (const line of out.split('\n')) {
+    // " * Prime Video                    com.amazon.firebat"  (* = system app, - = installed by the user)
+    const m = /^\s*([*-])\s+(.+?)\s{2,}(\S+)\s*$/.exec(line);
+    if (m) apps.push({ system: m[1] === '*', name: m[2].trim(), pkg: m[3] });
+  }
+  return apps;
 }
 
 function randomScid(): string {

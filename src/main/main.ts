@@ -3,11 +3,11 @@ import fs from 'fs';
 import path from 'path';
 import { DeviceManager, normalizeHost } from './devices';
 import { profileSetFor } from './profiles';
-import { detectEncoder, Session } from './scrcpy';
+import { detectEncoder, listApps, Session } from './scrcpy';
 import { flushSettings, getSettings, updateSettings } from './settings';
 import { Typer } from './typing';
 import { adb } from './adb';
-import type { ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
+import type { AppInfo, ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
 
 let win: BrowserWindow | null = null;
 const devices = new DeviceManager();
@@ -103,6 +103,34 @@ ipcMain.handle('devices:enableWifi', async (_e, serial: string) => {
   return result;
 });
 ipcMain.handle('devices:scan', () => devices.scanNetwork());
+
+// ---- Apps
+
+const appsCache = new Map<string, { at: number; apps: AppInfo[] }>();
+ipcMain.handle('apps:list', async (_e, serial: string, refresh: boolean) => {
+  const hit = appsCache.get(serial);
+  if (hit && !refresh && Date.now() - hit.at < 5 * 60_000) return hit.apps;
+  const apps = await listApps(serial);
+  appsCache.set(serial, { at: Date.now(), apps });
+  return apps;
+});
+ipcMain.handle('apps:launch', async (_e, serial: string, pkg: string) => {
+  typer.invalidate();
+  // TV apps declare the leanback launcher category; phone apps the regular one
+  for (const category of ['android.intent.category.LEANBACK_LAUNCHER', 'android.intent.category.LAUNCHER']) {
+    const out = await adb(['shell', 'monkey', '-p', pkg, '-c', category, '1'], { serial, timeout: 10000 }).catch((e) => String(e));
+    if (/Events injected: 1/.test(out)) return true;
+  }
+  return false;
+});
+ipcMain.handle('apps:stop', async (_e, serial: string, pkg: string) => {
+  await adb(['shell', 'am', 'force-stop', pkg], { serial }).catch(() => {});
+});
+ipcMain.handle('apps:current', async (_e, serial: string) => {
+  const out = await adb(['shell', 'dumpsys window | grep -m1 mCurrentFocus'], { serial, timeout: 3000 }).catch(() => '');
+  const m = /u0 ([\w.]+)\//.exec(out);
+  return m ? m[1] : null;
+});
 ipcMain.handle('devices:forgetNetwork', async (_e, host: string) => {
   const h = normalizeHost(host);
   if (status.state !== 'idle' && status.state !== 'ended' && status.serial === h) {

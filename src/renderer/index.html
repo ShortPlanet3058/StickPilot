@@ -34,6 +34,7 @@
       <div class="toolbar-spacer"></div>
       <div id="profile-picker" class="segmented no-drag" role="radiogroup" aria-label="Quality profile"></div>
       <div class="toolbar-actions no-drag">
+        <button id="btn-apps" class="icon-btn"></button>
         <button id="btn-remote-only" class="icon-btn"></button>
         <button id="btn-stats" class="icon-btn" aria-pressed="false"></button>
         <button id="btn-fullscreen" class="icon-btn"></button>
@@ -65,6 +66,7 @@
       </div>
       <div class="toolbar-spacer"></div>
       <div class="toolbar-actions no-drag">
+        <button id="btn-apps-compact" class="icon-btn"></button>
         <button id="btn-pin" class="icon-btn" aria-pressed="false"></button>
         <button id="btn-show-screen" class="icon-btn"></button>
         <button class="icon-btn btn-connect-icon"></button>
@@ -77,6 +79,7 @@
 
   <!-- Shared remote panel; moved into whichever view is showing -->
   <aside id="remote" aria-label="Remote">
+    <div id="fav-apps" class="fav-apps"></div>
     <div id="remote-buttons" class="remote-buttons"></div>
     <form id="type-form" class="type-form">
       <label for="type-text">Send text to the TV</label>
@@ -93,6 +96,7 @@
   </aside>
 
   <div id="switch-menu" class="menu" role="menu" hidden></div>
+  <div id="apps-panel" class="sheet" hidden></div>
   <div id="toasts" class="toasts" aria-live="polite"></div>
 
   <script src="app.js"></script>
