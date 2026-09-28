@@ -43,11 +43,15 @@ export class DoubleTap {
     uIOhook.on('mousedown', () => { this.lastTap = 0; this.clean = false; });
   }
 
+  get active(): boolean {
+    return this.running;
+  }
+
   /** Starts listening; returns a message when the shortcut can't work yet */
   start(): string | null {
     if (this.running) return null;
     if (process.platform === 'darwin' && !systemPreferences.isTrustedAccessibilityClient(false)) {
-      return 'To use double-tap Right Shift, allow StickPilot under Accessibility in System Settings, then restart StickPilot.';
+      return 'To use double-tap Right Shift, StickPilot needs Accessibility access. Click Allow access, then switch StickPilot on in the list.';
     }
     try {
       uIOhook.start();

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, shell, systemPreferences } from 'electron';
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -214,6 +214,9 @@ ipcMain.handle('session:connectRemote', async (_e, serial?: string) => {
 });
 ipcMain.on('window:showMain', () => showMain());
 ipcMain.on('system:openAccessibility', () => {
+  // Asking through the system prompt adds this exact build to the Accessibility list; a
+  // leftover entry from an older build can look switched on without applying to this one
+  if (systemPreferences.isTrustedAccessibilityClient(true)) return;
   void shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility');
 });
 
@@ -405,12 +408,24 @@ const tray = new TrayRemote({
 
 const doubleShift = new DoubleTap(() => tray.toggle());
 
+let accessWatch: NodeJS.Timeout | null = null;
+
 /** Starts or stops the Right Shift shortcut to match the setting; explains when it can't start */
 function applyDoubleShift(explain: boolean): void {
   if (!getSettings().doubleShift) { doubleShift.stop(); return; }
   const problem = doubleShift.start();
-  if (problem && explain) {
-    send('notice', { message: problem, action: process.platform === 'darwin' && /Accessibility/.test(problem) ? 'accessibility' : undefined });
+  if (!problem) return;
+  const needsAccess = process.platform === 'darwin' && /Accessibility/.test(problem);
+  if (explain) send('notice', { message: problem, action: needsAccess ? 'accessibility' : undefined });
+  // macOS applies the permission to the running app: start as soon as it's granted, no restart needed
+  if (needsAccess && !accessWatch) {
+    accessWatch = setInterval(() => {
+      if (!getSettings().doubleShift || doubleShift.start() === null) {
+        clearInterval(accessWatch!);
+        accessWatch = null;
+        if (doubleShift.active) send('notice', { message: 'Double-tap Right Shift now opens the mini remote.' });
+      }
+    }, 3000);
   }
 }
 

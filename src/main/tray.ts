@@ -113,7 +113,7 @@ export class TrayRemote {
     this.mediaKeysOn = false;
     if (!want) return null;
     if (process.platform === 'darwin' && !systemPreferences.isTrustedAccessibilityClient(false)) {
-      return 'To use the media keys, allow StickPilot in System Settings → Privacy & Security → Accessibility, then turn the option on again.';
+      return 'To use the media keys, StickPilot needs Accessibility access (System Settings → Privacy & Security → Accessibility), then turn the option on again.';
     }
     const ok = MEDIA_KEYS.every(([accel, code]) => globalShortcut.register(accel, () => { this.hooks.tap(code); }));
     this.mediaKeysOn = ok;

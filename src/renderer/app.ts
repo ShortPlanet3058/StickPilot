@@ -1051,7 +1051,7 @@ function wire(): void {
   api.onNotice((n) => toast(n.message, {
     kind: 'info',
     ms: n.action ? 20000 : 9000,
-    action: n.action === 'accessibility' ? { label: 'Open Settings', run: () => api.openAccessibilitySettings() } : undefined,
+    action: n.action === 'accessibility' ? { label: 'Allow access', run: () => api.openAccessibilitySettings() } : undefined,
   }));
   api.onFullscreen((on) => {
     state.fullscreen = on;
