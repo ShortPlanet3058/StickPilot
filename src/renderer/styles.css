@@ -821,3 +821,4 @@ button.danger { border-color: var(--danger); color: var(--danger); }
 .hidden-note { margin-top: 20px; font-size: 12px; color: var(--faint); }
 .hidden-note .link { margin-left: 0; font-size: 12px; }
 .menu-item.armed { background: color-mix(in srgb, var(--danger) 14%, transparent); font-weight: 500; }
+.dcard-sub .also { margin-left: 4px; color: var(--faint); }

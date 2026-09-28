@@ -189,6 +189,7 @@ function buildAddTile(): void {
     if (on) addTile.querySelector<HTMLInputElement>('#add-host')!.focus();
   };
   addTile.querySelector('.add-open')!.addEventListener('click', () => open(true));
+  addTile.querySelector('.add-close')!.addEventListener('click', () => open(false));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = addTile.querySelector<HTMLInputElement>('#add-host')!;
@@ -207,6 +208,21 @@ function buildAddTile(): void {
       renderHome();
     }
   });
+}
+
+/** Same TV found by Discover (matched by name) for a device that has no Wi-Fi connection yet */
+function discoveredTwin(g: DeviceGroup): ScanResult | undefined {
+  if (g.conns.some((c) => c.transport === 'network')) return undefined;
+  const names = new Set(g.conns.map((c) => c.name.toLowerCase()));
+  return state.discovered.find((f) => f.adb && !f.connected && names.has(f.name.toLowerCase()));
+}
+
+function wifiOffer(g: DeviceGroup, d: DeviceInfo, live: boolean): string {
+  if (d.transport !== 'usb' || d.state !== 'device' || g.conns.some((c) => c.transport === 'network') || live) return '';
+  const twin = discoveredTwin(g);
+  return twin
+    ? `<span class="also">· also on Wi-Fi (${esc(twin.ip)})</span><button class="link" data-join="${esc(twin.host)}" title="Connect over Wi-Fi too, so it works without the cable">Connect over Wi-Fi</button>`
+    : `<button class="link" data-wifi="${esc(d.serial)}" title="Connect this device over Wi-Fi too, so it works without the cable">Set up Wi-Fi</button>`;
 }
 
 function deviceCard(g: DeviceGroup): string {
@@ -230,10 +246,7 @@ function deviceCard(g: DeviceGroup): string {
   const picker = transports.length > 1 && !live
     ? `<div class="mini-seg" role="radiogroup" aria-label="Connection">${(['usb', 'network'] as Transport[]).map((t) =>
       `<button role="radio" data-transport="${t}" data-group="${esc(g.key)}" aria-checked="${d.transport === t}">${icon(t === 'network' ? 'wifi' : 'usb', 13)}${t === 'network' ? 'Wi-Fi' : 'USB'}</button>`).join('')}</div>`
-    : `<p class="dcard-sub">${icon(d.transport === 'network' ? 'wifi' : 'usb', 13)}<span>${esc(via(d))}</span>${
-      d.transport === 'usb' && d.state === 'device' && !g.conns.some((c) => c.transport === 'network') && !live
-        ? `<button class="link" data-wifi="${esc(d.serial)}" title="Connect this device over Wi-Fi too, so it works without the cable">Set up Wi-Fi</button>` : ''
-    }</p>`;
+    : `<p class="dcard-sub">${icon(d.transport === 'network' ? 'wifi' : 'usb', 13)}<span>${esc(via(d))}</span>${wifiOffer(g, d, !!live)}</p>`;
 
   const more = `<button class="icon-btn more" data-more="${esc(g.key)}" title="More" aria-haspopup="menu">${icon('more', 18)}</button>`;
   const detail = d.state === 'unauthorized' ? 'Not authorized yet' : [d.osLabel, d.model && d.model !== d.name ? d.model : ''].filter(Boolean).join(' · ');
@@ -614,7 +627,12 @@ async function discover(manual: boolean): Promise<void> {
   }
   if (manual) {
     const n = discoveredFor(currentTab()).length;
-    toast(n ? `Found ${n} new device${n > 1 ? 's' : ''} on your network.` : 'No new devices found on your network.', { kind: n ? 'ok' : 'info' });
+    const twins = groupDevices(state.devices).map(discoveredTwin).filter((f): f is ScanResult => !!f);
+    const already = state.discovered.filter((f) => f.connected).length;
+    if (n) toast(`Found ${n} new device${n > 1 ? 's' : ''} on your network.`, { kind: 'ok' });
+    else if (twins.length) toast(`${twins.map((t) => t.name).join(', ')} ${twins.length > 1 ? 'are' : 'is'} also on your network. Use Connect over Wi-Fi on the card.`, { kind: 'ok', ms: 7000 });
+    else if (already) toast(`Found ${already} device${already > 1 ? 's' : ''} on your network, already connected.`, { kind: 'info' });
+    else toast('No devices found on your network. ADB debugging must be on, on the same network.', { kind: 'info', ms: 7000 });
   }
   render();
 }
