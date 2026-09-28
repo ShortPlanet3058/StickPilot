@@ -35,5 +35,12 @@ export function serverPath(): string {
   return found;
 }
 
+/** StickPilot's own on-device helper (app icons), built from helper/src */
+export function helperPath(): string {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, 'helper', 'stickpilot-helper.jar')
+    : path.join(app.getAppPath(), 'helper', 'dist', 'stickpilot-helper.jar');
+}
+
 /** The server protocol changes between versions, so the client is pinned to this one */
 export const SERVER_VERSION = '4.1';

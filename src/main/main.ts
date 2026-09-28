@@ -6,6 +6,7 @@ import { DeviceManager, normalizeHost } from './devices';
 import { profileSetFor } from './profiles';
 import { detectEncoder, listApps, Session } from './scrcpy';
 import { flushSettings, getSettings, updateSettings } from './settings';
+import { appArt, cachedAppArt } from './appIcons';
 import { adbPath } from './paths';
 import { Recorder } from './recorder';
 import { TrayRemote } from './tray';
@@ -135,6 +136,8 @@ ipcMain.handle('apps:list', async (_e, serial: string, refresh: boolean) => {
   appsCache.set(serial, { at: Date.now(), apps });
   return apps;
 });
+ipcMain.handle('apps:art', (_e, serial: string, pkgs: string[], refresh: boolean) => appArt(serial, pkgs, refresh));
+ipcMain.handle('apps:cachedArt', (_e, pkgs: string[]) => cachedAppArt(pkgs));
 ipcMain.handle('apps:launch', async (_e, serial: string, pkg: string) => {
   typer.invalidate();
   // TV apps declare the leanback launcher category; phone apps the regular one

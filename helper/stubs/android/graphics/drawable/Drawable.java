@@ -1,0 +1,2 @@
+// Compile-time stand-in; the real class on the device is used at runtime.
+package android.graphics.drawable; import android.graphics.Canvas; public abstract class Drawable { public int getIntrinsicWidth() { throw new RuntimeException("stub"); } public int getIntrinsicHeight() { throw new RuntimeException("stub"); } public void setBounds(int l, int t, int r, int b) { throw new RuntimeException("stub"); } public abstract void draw(Canvas c); }

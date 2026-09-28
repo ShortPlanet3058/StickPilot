@@ -1,0 +1,2 @@
+// Compile-time stand-in; the real class on the device is used at runtime.
+package android.graphics; import java.io.OutputStream; public final class Bitmap { public enum Config { ARGB_8888 } public enum CompressFormat { PNG } public static Bitmap createBitmap(int w, int h, Config c) { throw new RuntimeException("stub"); } public boolean compress(CompressFormat f, int q, OutputStream s) { throw new RuntimeException("stub"); } }

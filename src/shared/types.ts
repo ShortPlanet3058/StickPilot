@@ -108,6 +108,14 @@ export interface DeviceStatusInfo {
   awake: boolean | null;
 }
 
+/** App artwork as data: URLs */
+export interface AppArt {
+  /** Wide TV launcher banner (usually 320x180) */
+  banner?: string;
+  /** Square launcher icon */
+  icon?: string;
+}
+
 export interface ScanResult {
   host: string;
   /** Reverse DNS name if the router provides one */
@@ -125,6 +133,9 @@ export interface FireTvApi {
   enableWifi(serial: string): Promise<NetworkResult>;
   scanNetwork(): Promise<ScanResult[]>;
   listApps(serial: string, refresh?: boolean): Promise<AppInfo[]>;
+  /** Real app logos, fetched from the device once and cached */
+  appArt(serial: string, pkgs: string[], refresh?: boolean): Promise<Record<string, AppArt>>;
+  cachedAppArt(pkgs: string[]): Promise<Record<string, AppArt>>;
   launchApp(serial: string, pkg: string): Promise<boolean>;
   forceStopApp(serial: string, pkg: string): Promise<void>;
   /** Package of the app in front on the device, if any */

@@ -9,7 +9,8 @@
     "start": "node scripts/build.mjs && electron .",
     "debug": "node scripts/build.mjs && FIRETV_DEBUG=1 electron .",
     "typecheck": "tsc",
-    "vendor": "node scripts/vendor.mjs"
+    "vendor": "node scripts/vendor.mjs",
+    "helper": "node scripts/build-helper.mjs"
   },
   "license": "UNLICENSED",
   "devDependencies": {

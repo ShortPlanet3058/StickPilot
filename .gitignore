@@ -4,3 +4,4 @@ vendor/
 release/
 .DS_Store
 tools/runs/
+tools/build/

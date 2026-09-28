@@ -1,4 +1,4 @@
-import { AppsPanel, avatar, paintAvatars } from './apps';
+import { AppsPanel, appIcon, paintAvatars } from './apps';
 import { AudioPlayer } from './audio';
 import { DevicePanel } from './devicePanel';
 import { icon } from './icons';
@@ -447,7 +447,7 @@ function renderFavorites(): void {
   const favs = favoritesFor(state.current).slice(0, 3);
   const html = favs.map((pkg) => {
     const app = apps.byPkg(pkg) ?? { pkg, name: pkg.split('.').pop() ?? pkg, system: false };
-    return `<button class="fav" data-fav="${esc(pkg)}" title="Open ${esc(app.name)}">${avatar(app, 28)}<span>${esc(app.name)}</span></button>`;
+    return `<button class="fav" data-fav="${esc(pkg)}" title="Open ${esc(app.name)}">${appIcon(app, apps.art[pkg], 28)}<span>${esc(app.name)}</span></button>`;
   }).join('') + `<button class="fav all" data-apps title="All apps (${MOD}A)">${icon('grid', 18)}<span>${favs.length ? 'All apps' : 'Apps'}</span></button>`;
   const row = $('fav-apps');
   if (row.dataset.html !== html) {

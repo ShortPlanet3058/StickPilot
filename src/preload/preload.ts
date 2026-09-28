@@ -9,6 +9,8 @@ const api: FireTvApi = {
   enableWifi: (serial) => ipcRenderer.invoke('devices:enableWifi', serial),
   scanNetwork: () => ipcRenderer.invoke('devices:scan'),
   listApps: (serial, refresh = false) => ipcRenderer.invoke('apps:list', serial, refresh),
+  appArt: (serial, pkgs, refresh = false) => ipcRenderer.invoke('apps:art', serial, pkgs, refresh),
+  cachedAppArt: (pkgs) => ipcRenderer.invoke('apps:cachedArt', pkgs),
   launchApp: (serial, pkg) => ipcRenderer.invoke('apps:launch', serial, pkg),
   forceStopApp: (serial, pkg) => ipcRenderer.invoke('apps:stop', serial, pkg),
   currentApp: (serial) => ipcRenderer.invoke('apps:current', serial),

@@ -1,0 +1,2 @@
+// Compile-time stand-in; the real class on the device is used at runtime.
+package android.content.res; import android.graphics.drawable.Drawable; import android.util.DisplayMetrics; public class Resources { public Resources(AssetManager a, DisplayMetrics m, Configuration c) { throw new RuntimeException("stub"); } public Drawable getDrawableForDensity(int id, int density, Theme theme) { throw new RuntimeException("stub"); } public final class Theme {} }

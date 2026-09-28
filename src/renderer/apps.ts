@@ -1,8 +1,9 @@
 // App launcher: a panel listing the device's apps, with search, favorites and
-// force close. Icons aren't available over adb, so apps get a lettered avatar.
+// force close. Tiles show the apps' real TV banners (fetched from the device by
+// StickPilot's helper), falling back to the icon, then to a lettered avatar.
 
 import { icon } from './icons';
-import type { AppInfo, FireTvApi } from '../shared/types';
+import type { AppArt, AppInfo, FireTvApi } from '../shared/types';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -12,6 +13,12 @@ const HIDDEN = new Set([
   'com.amazon.firetv.troubleshooting', 'com.amazon.tv.earlyaccess', 'com.amazon.tv.ftvambient',
   'com.amazon.whasettings', 'com.amazon.smarthomemapviewapp',
 ]);
+
+/** Square image for an app: its real icon if known, else a lettered avatar */
+export function appIcon(app: AppInfo, art: AppArt | undefined, size = 40): string {
+  if (art?.icon) return `<img class="app-icon" src="${art.icon}" width="${size}" height="${size}" alt="" draggable="false">`;
+  return avatar(app, size);
+}
 
 export function avatar(app: AppInfo, size = 40): string {
   const words = app.name.replace(/[^\p{L}\p{N} ]/gu, ' ').trim().split(/\s+/);
@@ -47,6 +54,8 @@ export class AppsPanel {
   private current: string | null = null;
   private query = '';
   private loadedFor: string | null = null;
+  /** Logos by package, filled in as they arrive */
+  art: Record<string, AppArt> = {};
   isOpen = false;
 
   constructor(private root: HTMLElement, private api: FireTvApi, private ctx: AppsContext) {
@@ -122,11 +131,27 @@ export class AppsPanel {
       try {
         this.apps = await this.api.listApps(serial, refresh);
         this.loadedFor = serial;
+        void this.loadArt(serial, refresh);
       } catch {
         this.ctx.toast('Could not read the list of apps from the device.', 'error');
       }
     }
     this.current = await this.api.currentApp(serial).catch(() => null);
+    this.render();
+    this.onLoaded();
+  }
+
+  /** Letters show first; the logos replace them once fetched (cached after the first time) */
+  private async loadArt(serial: string, refresh: boolean): Promise<void> {
+    const pkgs = this.apps.filter((a) => !HIDDEN.has(a.pkg)).map((a) => a.pkg);
+    this.art = { ...this.art, ...(await this.api.cachedAppArt(pkgs)) };
+    this.render();
+    this.onLoaded();
+    try {
+      this.art = { ...this.art, ...(await this.api.appArt(serial, pkgs, refresh)) };
+    } catch {
+      // Logos are a nicety: keep the letters if the helper can't run
+    }
     this.render();
     this.onLoaded();
   }
@@ -168,8 +193,13 @@ export class AppsPanel {
 
   private tile(a: AppInfo, favs: string[]): string {
     const pinned = favs.includes(a.pkg);
+    const art = this.art[a.pkg];
+    // TV banners already show the app's name; the label stays for icons and letters
+    const visual = art?.banner
+      ? `<img class="app-banner" src="${art.banner}" alt="" draggable="false">`
+      : `<span class="app-banner placeholder">${appIcon(a, art, 44)}</span>`;
     return `<div class="app-tile${a.pkg === this.current ? ' running' : ''}">
-        <button class="app-launch" data-launch="${esc(a.pkg)}" title="Open ${esc(a.name)}">${avatar(a)}<span>${esc(a.name)}</span></button>
+        <button class="app-launch" data-launch="${esc(a.pkg)}" title="Open ${esc(a.name)}">${visual}<span>${esc(a.name)}</span></button>
         <button class="icon-btn app-pin${pinned ? ' on' : ''}" data-pin="${esc(a.pkg)}" title="${pinned ? 'Remove from favorites' : 'Add to favorites'}" aria-pressed="${pinned}">${icon('pin', 14)}</button>
       </div>`;
   }
@@ -187,7 +217,7 @@ export class AppsPanel {
       apps.length ? `<h3 class="sheet-section">${title}</h3><div class="app-grid">${apps.map((a) => this.tile(a, favs)).join('')}</div>` : '';
     let html = '';
     if (cur && !HIDDEN.has(cur.pkg) && !this.query) {
-      html += `<div class="now-open">${avatar(cur, 32)}<div><small>Open now</small><span>${esc(cur.name)}</span></div>
+      html += `<div class="now-open">${appIcon(cur, this.art[cur.pkg], 32)}<div><small>Open now</small><span>${esc(cur.name)}</span></div>
         <button data-stop="${esc(cur.pkg)}" title="Force close this app, e.g. when it is stuck">Force close</button></div>`;
     }
     if (!this.query) html += section('Favorites', favs.map((p) => this.byPkg(p)).filter((a): a is AppInfo => !!a));
