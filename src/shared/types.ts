@@ -75,6 +75,8 @@ export interface Settings {
   mediaKeys: boolean;
   /** Double-tapping Right Shift anywhere opens the menu-bar remote */
   doubleShift: boolean;
+  /** Closing the window keeps StickPilot in the menu bar (and out of the Dock) instead of quitting */
+  stayInMenuBar: boolean;
 }
 
 export interface VideoPacket {

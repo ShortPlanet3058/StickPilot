@@ -17,6 +17,8 @@ export interface TrayHooks {
   setMediaKeys(on: boolean): void;
   doubleShiftEnabled(): boolean;
   setDoubleShift(on: boolean): void;
+  stayInMenuBar(): boolean;
+  setStayInMenuBar(on: boolean): void;
 }
 
 const MEDIA_KEYS: [string, number][] = [
@@ -78,8 +80,14 @@ export class TrayRemote {
         checked: this.hooks.doubleShiftEnabled(),
         click: (item) => this.hooks.setDoubleShift(item.checked),
       },
+      {
+        label: 'Keep running in the menu bar when closed',
+        type: 'checkbox',
+        checked: this.hooks.stayInMenuBar(),
+        click: (item) => this.hooks.setStayInMenuBar(item.checked),
+      },
       { type: 'separator' },
-      { label: 'Quit', click: () => this.hooks.quit() },
+      { label: 'Quit StickPilot', accelerator: 'CommandOrControl+Q', click: () => this.hooks.quit() },
     ]);
   }
 

@@ -17,6 +17,7 @@ const DEFAULTS: Settings = {
   audioEnabled: false,
   mediaKeys: false,
   doubleShift: true,
+  stayInMenuBar: true,
 };
 
 const file = () => path.join(app.getPath('userData'), 'settings.json');

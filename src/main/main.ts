@@ -365,9 +365,12 @@ function createWindow(): void {
   // more, so a mirroring session drops to remote only (no encoding on the device).
   win.on('close', (e) => {
     if (quitting) return;
+    if (!getSettings().stayInMenuBar) { app.quit(); return; }
     e.preventDefault();
     if (win?.isFullScreen()) win.setFullScreen(false);
     win?.hide();
+    // Menu bar only from now on: no Dock icon, not in ⌘Tab, until the window is opened again
+    if (process.platform === 'darwin') app.dock?.hide();
     if (status.state === 'running' && status.mode === 'mirror') void start(status.serial, status.profileId, 'remote').catch(() => {});
   });
   win.on('enter-full-screen', () => send('window:fullscreen', true));
@@ -399,6 +402,8 @@ const tray = new TrayRemote({
     updateSettings({ doubleShift: on });
     applyDoubleShift(true);
   },
+  stayInMenuBar: () => getSettings().stayInMenuBar,
+  setStayInMenuBar: (on) => { updateSettings({ stayInMenuBar: on }); },
   setMediaKeys: (on) => {
     updateSettings({ mediaKeys: on });
     const notice = tray.updateMediaKeys(status.state === 'running');
@@ -431,6 +436,8 @@ function applyDoubleShift(explain: boolean): void {
 
 function showMain(): void {
   if (!win || win.isDestroyed()) createWindow();
+  // The Dock icon comes back with the window (it was hidden when the window closed)
+  if (process.platform === 'darwin' && !app.dock?.isVisible()) void app.dock?.show();
   win!.show();
   win!.focus();
 }
