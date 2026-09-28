@@ -745,3 +745,33 @@ body.tray-page { display: flex; flex-direction: column; height: 100vh; backgroun
 #btn-record.recording { width: auto; padding: 0 10px; gap: 6px; color: #fff; background: #dc2626; }
 #btn-record.recording:hover { background: #b91c1c; }
 .rec-time { font-size: 12px; font-variant-numeric: tabular-nums; }
+
+/* ---------- Drag and drop ---------- */
+
+.drop-zone {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(15 16 18 / 0.72);
+  pointer-events: none;
+}
+.drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 420px;
+  padding: 32px 36px;
+  border: 2px dashed var(--accent);
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: center;
+  color: var(--text);
+}
+.drop-card .icon { color: var(--accent); }
+.drop-zone.invalid .drop-card { border-color: var(--warn); }
+.drop-zone.invalid .drop-card .icon { color: var(--warn); }

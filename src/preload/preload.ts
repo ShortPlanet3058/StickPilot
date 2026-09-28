@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { FireTvApi } from '../shared/types';
 
 const api: FireTvApi = {
@@ -39,6 +39,9 @@ const api: FireTvApi = {
   stopRecording: () => ipcRenderer.invoke('record:stop'),
   onRecordingStopped: (cb) => { ipcRenderer.on('record:stopped', (_e, r) => cb(r)); },
   showInFolder: (file) => ipcRenderer.send('shell:showItem', file),
+  pathForFile: (file) => webUtils.getPathForFile(file),
+  installApk: (serial, path) => ipcRenderer.invoke('files:install', serial, path),
+  pushFile: (serial, path) => ipcRenderer.invoke('files:push', serial, path),
   onNotice: (cb) => { ipcRenderer.on('notice', (_e, m) => cb(m)); },
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),

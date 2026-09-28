@@ -152,6 +152,11 @@ export interface FireTvApi {
   /** The recording ended on its own (disconnected, profile changed) */
   onRecordingStopped(cb: (result: { file: string; seconds: number } | null) => void): void;
   showInFolder(file: string): void;
+  /** Local path of a dropped file */
+  pathForFile(file: File): string;
+  installApk(serial: string, path: string): Promise<{ ok: boolean; message: string }>;
+  /** Copies a file or folder to the device's Download folder */
+  pushFile(serial: string, path: string): Promise<{ ok: boolean; message: string }>;
   /** Messages from the main process to show as notices (e.g. media key permission) */
   onNotice(cb: (message: string) => void): void;
   getSettings(): Promise<Settings>;

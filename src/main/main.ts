@@ -208,6 +208,36 @@ ipcMain.handle('record:start', (_e, width: number, height: number) => {
 });
 ipcMain.handle('record:stop', () => recorder.stop());
 ipcMain.on('shell:showItem', (_e, file: string) => shell.showItemInFolder(file));
+
+// ---- Dropped files
+
+const shortError = (e: unknown) => String((e as Error).message ?? e).split('\n').filter(Boolean).pop()?.replace(/^adb \w+: /, '') ?? '';
+
+ipcMain.handle('files:install', async (_e, serial: string, file: string) => {
+  try {
+    // -r replaces an installed version (keeps its data)
+    const out = await adb(['install', '-r', file], { serial, timeout: 5 * 60_000 });
+    return /Success/.test(out) ? { ok: true, message: `${path.basename(file)} installed.` } : { ok: false, message: out.trim() };
+  } catch (e) {
+    const msg = shortError(e);
+    const hint = /INSUFFICIENT_STORAGE/.test(msg) ? 'not enough free space on the device.'
+      : /VERSION_DOWNGRADE/.test(msg) ? 'a newer version is already installed.'
+      : /UPDATE_INCOMPATIBLE|SIGNATURES/.test(msg) ? 'an incompatible version is installed; uninstall it on the device first.'
+      : /NO_MATCHING_ABIS/.test(msg) ? "it isn't built for this device."
+      : /INSTALL_PARSE_FAILED|NOT_APK/.test(msg) ? "the file isn't a valid APK."
+      // Otherwise keep just the error code, e.g. INSTALL_FAILED_...
+      : /Failure \[(\w+)/.exec(msg)?.[1] ?? msg;
+    return { ok: false, message: `${path.basename(file)} could not be installed: ${hint}` };
+  }
+});
+ipcMain.handle('files:push', async (_e, serial: string, file: string) => {
+  try {
+    await adb(['push', file, '/sdcard/Download/'], { serial, timeout: 10 * 60_000 });
+    return { ok: true, message: `${path.basename(file)} copied to Download on the device.` };
+  } catch (e) {
+    return { ok: false, message: `${path.basename(file)} could not be copied: ${shortError(e)}` };
+  }
+});
 ipcMain.on('key', (_e, keycode: number, action: 0 | 1, repeat: number) => {
   session.key(keycode, action, repeat);
   typer.invalidate(); // navigation may have changed the focused screen

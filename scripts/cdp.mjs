@@ -42,6 +42,14 @@ if (cmd === 'eval') {
     await new Promise((r) => setTimeout(r, 350));
   }
   console.log('keys sent');
+} else if (cmd === 'drop') {
+  // Simulated file drag from the OS: node scripts/cdp.mjs drop <x> <y> <file>...
+  const [x, y] = [Number(arg), Number(process.argv[4])];
+  const data = { items: [], files: process.argv.slice(5), dragOperationsMask: 1 };
+  for (const type of ['dragEnter', 'dragOver']) await call('Input.dispatchDragEvent', { type, x, y, data });
+  await new Promise((r) => setTimeout(r, 400));
+  await call('Input.dispatchDragEvent', { type: 'drop', x, y, data });
+  console.log('dropped');
 } else if (cmd === 'shot') {
   const r = await call('Page.captureScreenshot', { format: 'png' });
   writeFileSync(arg, Buffer.from(r.data, 'base64'));

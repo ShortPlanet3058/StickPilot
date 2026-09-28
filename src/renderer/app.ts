@@ -669,6 +669,59 @@ async function toggleRecording(): Promise<void> {
 setInterval(() => { if (state.recordingSince && state.view === 'player') renderToolbars(); }, 1000);
 api.onRecordingStopped(recordingSaved);
 
+// ---------- Dropped files: APKs are installed, anything else goes to Download ----------
+
+function dropTarget(): DeviceInfo | undefined {
+  if (state.view === 'home') {
+    // On the device screen, only when there's no doubt which device is meant
+    const ready = groupDevices(state.devices).map(primaryConn).filter((d) => d.state === 'device');
+    return ready.length === 1 ? ready[0] : undefined;
+  }
+  const d = device(state.current);
+  return d?.state === 'device' ? d : undefined;
+}
+
+function setupDrop(): void {
+  let depth = 0;
+  const zone = $('drop-zone');
+  const hide = () => { depth = 0; zone.hidden = true; };
+  document.addEventListener('dragenter', (e) => {
+    if (!e.dataTransfer?.types.includes('Files')) return;
+    e.preventDefault();
+    depth++;
+    const d = dropTarget();
+    const items = [...(e.dataTransfer.items ?? [])];
+    // File names aren't readable until the drop; the MIME type tells APKs apart where available
+    const apk = items.length > 0 && items.every((i) => i.type === 'application/vnd.android.package-archive');
+    $('drop-icon').innerHTML = icon(d ? (apk ? 'plus' : 'send') : 'alert', 28);
+    $('drop-text').innerHTML = d
+      ? (apk ? `Drop to install on <b>${esc(d.name)}</b>` : `Drop to install APKs or copy files to <b>${esc(d.name)}</b>`)
+      : 'Connect or select a device first';
+    zone.classList.toggle('invalid', !d);
+    zone.hidden = false;
+  });
+  document.addEventListener('dragleave', () => { if (--depth <= 0) hide(); });
+  // Without this, Electron opens a dropped file in place of the app
+  document.addEventListener('dragover', (e) => e.preventDefault());
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
+    hide();
+    const d = dropTarget();
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (!d || !files.length) return;
+    void (async () => {
+      for (const f of files) {
+        const path = api.pathForFile(f);
+        const isApk = /\.apk$/i.test(f.name);
+        toast(isApk ? `Installing ${f.name} on ${d.name}…` : `Copying ${f.name} to ${d.name}…`, { ms: 3000 });
+        const r = isApk ? await api.installApk(d.serial, path) : await api.pushFile(d.serial, path);
+        toast(r.message, { kind: r.ok ? 'ok' : 'error', ms: r.ok ? 5000 : 9000 });
+        if (r.ok && isApk) void apps.load(true); // the launcher should list the new app
+      }
+    })();
+  });
+}
+
 // ---------- Sound ----------
 
 const audio = new AudioPlayer(api);
@@ -745,6 +798,7 @@ function wire(): void {
   $('type-send').innerHTML = icon('send', 18);
   $('fs-exit').innerHTML = `${icon('exitFullscreen', 16)}<span>Exit fullscreen</span>`;
   buildAddTile();
+  setupDrop();
 
   // Device screen
   $('home-tabs').addEventListener('click', (e) => {
