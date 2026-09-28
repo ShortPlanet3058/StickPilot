@@ -3,6 +3,7 @@
   "productName": "StickPilot",
   "version": "0.1.0",
   "description": "StickPilot: mirror and control a Fire TV (or other Android device) from your computer",
+  "author": "Finn Vignon",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
@@ -11,16 +12,68 @@
     "debug": "node scripts/build.mjs && STICKPILOT_DEBUG=1 electron .",
     "typecheck": "tsc",
     "vendor": "node scripts/vendor.mjs",
-    "helper": "node scripts/build-helper.mjs"
+    "helper": "node scripts/build-helper.mjs",
+    "dist:mac": "node scripts/build.mjs && electron-builder --mac dmg --x64"
   },
   "license": "UNLICENSED",
   "devDependencies": {
     "@types/node": "^26.6.3",
     "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   },
   "dependencies": {
     "mp4-muxer": "^5.2.2"
+  },
+  "build": {
+    "appId": "app.stickpilot",
+    "productName": "StickPilot",
+    "copyright": "Copyright © 2026 Finn Vignon",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraResources": [
+      {
+        "from": "vendor/scrcpy-server",
+        "to": "vendor/scrcpy-server"
+      },
+      {
+        "from": "vendor/scrcpy-LICENSE",
+        "to": "vendor/scrcpy-LICENSE"
+      },
+      {
+        "from": "vendor/${platform}-${arch}",
+        "to": "vendor/${platform}-${arch}"
+      },
+      {
+        "from": "helper/dist/stickpilot-helper.jar",
+        "to": "helper/stickpilot-helper.jar"
+      },
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "icon.png",
+          "icon-512.png"
+        ]
+      }
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "assets/StickPilot.icns",
+      "category": "public.app-category.utilities",
+      "identity": null
+    },
+    "dmg": {
+      "title": "StickPilot ${version}",
+      "artifactName": "StickPilot-${version}-mac-${arch}.${ext}"
+    }
   }
 }

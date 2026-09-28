@@ -29,6 +29,13 @@ npm start           # builds and opens the app
 - `npm run typecheck` runs the TypeScript compiler.
 - `npm run debug` prints the device-side server log.
 
+### Packaging
+
+`npm run dist:mac` builds `release/StickPilot-<version>-mac-x64.dmg` (Intel). adb, the scrcpy
+server, the icon helper and the icons are bundled in the app's Resources, so it doesn't need a local
+scrcpy download. The app isn't signed with an Apple Developer ID: a copy downloaded from elsewhere
+needs right-click → Open the first time.
+
 ### Driving the app from scripts
 
 `npx electron . --remote-debugging-port=9223` starts the app with the DevTools protocol on.
