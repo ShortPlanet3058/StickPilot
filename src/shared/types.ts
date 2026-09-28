@@ -93,6 +93,21 @@ export interface AppInfo {
   system: boolean;
 }
 
+export interface DeviceStatusInfo {
+  storage: { totalKB: number; usedKB: number; freeKB: number } | null;
+  memory: { totalKB: number; availableKB: number } | null;
+  /** CPU temperature in °C and whether the system is throttling because of heat */
+  cpuTemp: number | null;
+  throttled: boolean;
+  wifi: { rssi: number; linkMbps: number; freqMHz: number } | null;
+  uptimeSec: number | null;
+  screen: string;
+  ip: string | null;
+  abi: string;
+  cores: number | null;
+  awake: boolean | null;
+}
+
 export interface ScanResult {
   host: string;
   /** Reverse DNS name if the router provides one */
@@ -155,6 +170,9 @@ export interface FireTvApi {
   /** Local path of a dropped file */
   pathForFile(file: File): string;
   installApk(serial: string, path: string): Promise<{ ok: boolean; message: string }>;
+  deviceInfo(serial: string): Promise<DeviceStatusInfo>;
+  /** Sleep, wake or restart the device */
+  devicePower(serial: string, action: 'sleep' | 'wake' | 'reboot'): Promise<void>;
   /** Copies a file or folder to the device's Download folder */
   pushFile(serial: string, path: string): Promise<{ ok: boolean; message: string }>;
   /** Messages from the main process to show as notices (e.g. media key permission) */

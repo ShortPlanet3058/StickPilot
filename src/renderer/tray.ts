@@ -67,6 +67,7 @@ bindKeyboard(api, {
   toggleSound: () => {},
   screenshot: () => {},
   toggleRecording: () => {},
+  toggleDevicePanel: () => {},
 });
 
 $('t-open').addEventListener('click', () => api.showMainWindow());

@@ -209,6 +209,19 @@ ipcMain.handle('record:start', (_e, width: number, height: number) => {
 ipcMain.handle('record:stop', () => recorder.stop());
 ipcMain.on('shell:showItem', (_e, file: string) => shell.showItemInFolder(file));
 
+// ---- Device panel
+
+ipcMain.handle('device:info', (_e, serial: string) => devices.statusInfo(serial));
+ipcMain.handle('device:power', async (_e, serial: string, action: 'sleep' | 'wake' | 'reboot') => {
+  if (action === 'reboot') {
+    if (status.state !== 'idle' && status.state !== 'ended' && status.serial === serial) await session.stop();
+    await adb(['reboot'], { serial }).catch(() => {});
+    return;
+  }
+  // KEYCODE_SLEEP / KEYCODE_WAKEUP, verified on Fire OS 8
+  await adb(['shell', 'input', 'keyevent', action === 'sleep' ? '223' : '224'], { serial }).catch(() => {});
+});
+
 // ---- Dropped files
 
 const shortError = (e: unknown) => String((e as Error).message ?? e).split('\n').filter(Boolean).pop()?.replace(/^adb \w+: /, '') ?? '';

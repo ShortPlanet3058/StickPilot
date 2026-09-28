@@ -42,6 +42,8 @@ const api: FireTvApi = {
   pathForFile: (file) => webUtils.getPathForFile(file),
   installApk: (serial, path) => ipcRenderer.invoke('files:install', serial, path),
   pushFile: (serial, path) => ipcRenderer.invoke('files:push', serial, path),
+  deviceInfo: (serial) => ipcRenderer.invoke('device:info', serial),
+  devicePower: (serial, action) => ipcRenderer.invoke('device:power', serial, action),
   onNotice: (cb) => { ipcRenderer.on('notice', (_e, m) => cb(m)); },
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),

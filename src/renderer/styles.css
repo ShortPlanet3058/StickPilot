@@ -775,3 +775,30 @@ body.tray-page { display: flex; flex-direction: column; height: 100vh; backgroun
 .drop-card .icon { color: var(--accent); }
 .drop-zone.invalid .drop-card { border-color: var(--warn); }
 .drop-zone.invalid .drop-card .icon { color: var(--warn); }
+
+/* ---------- Device panel ---------- */
+
+.device-title { margin: 4px 0 18px; }
+.device-title h3 { font-size: 17px; font-weight: 600; }
+.device-title p { margin-top: 2px; color: var(--muted); font-size: 12px; }
+.stats-list { display: flex; flex-direction: column; gap: 16px; }
+.stat-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 12px; color: var(--muted); }
+.stat-head b { color: var(--text); font-weight: 500; text-align: right; }
+.stat-note { margin-top: 6px; font-size: 12px; color: var(--faint); }
+.stat-note.warn { color: var(--warn); }
+.meter { height: 6px; margin-top: 8px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.meter-fill { height: 100%; border-radius: 3px; background: var(--accent); }
+.meter.warn .meter-fill { background: var(--warn); }
+.wifi-bars { display: flex; align-items: flex-end; gap: 3px; height: 16px; margin-top: 8px; }
+.wifi-bars span { width: 6px; border-radius: 2px; background: var(--surface-3); }
+.wifi-bars span:nth-child(1) { height: 25%; }
+.wifi-bars span:nth-child(2) { height: 50%; }
+.wifi-bars span:nth-child(3) { height: 75%; }
+.wifi-bars span:nth-child(4) { height: 100%; }
+.wifi-bars span.on { background: var(--ok); }
+.facts { display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; margin: 22px 0 0; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; text-align: right; user-select: text; }
+.power-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.power-row button { flex: 1; }
+button.danger { border-color: var(--danger); color: var(--danger); }

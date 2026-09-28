@@ -1,5 +1,6 @@
 import { AppsPanel, avatar, paintAvatars } from './apps';
 import { AudioPlayer } from './audio';
+import { DevicePanel } from './devicePanel';
 import { icon } from './icons';
 import { bindKeyboard } from './keyboard';
 import { bindRemote, flashKey, isMac, layoutFor, MOD, renderRemote, triggerQuickSettings } from './remote';
@@ -475,7 +476,7 @@ function renderRemotePanel(): void {
     [`${MOD}Space`, 'Play / Pause'], [`${MOD}← ${MOD}→`, 'Rewind / Forward'],
     [`${MOD}↑ ${MOD}↓`, 'Volume'], [`${MOD}0`, 'Mute'],
     [`${MOD}A`, 'Apps'], [`${MOD}U`, 'Sound on this computer'],
-    [`${MOD}C`, 'Screenshot'], [`${MOD}⇧C`, 'Record the screen'],
+    [`${MOD}C`, 'Screenshot'], [`${MOD}⇧C`, 'Record the screen'], [`${MOD}D`, 'Device status'],
     [`${MOD}V`, 'Paste clipboard'], [`${MOD}F`, 'Fullscreen'],
   ];
   $('shortcuts').innerHTML = rows.map(([k, v]) =>
@@ -629,6 +630,12 @@ const apps = new AppsPanel($('apps-panel'), api, {
   done: () => focusTarget().focus(),
 });
 apps.onLoaded = () => renderFavorites();
+
+const devicePanel = new DevicePanel($('device-panel'), api, {
+  device: () => device(state.current),
+  toast: (m, kind) => toast(m, { kind }),
+  done: () => focusTarget().focus(),
+});
 
 function toggleApps(): void {
   if (!isRunning()) return;
@@ -849,6 +856,7 @@ function wire(): void {
   $('btn-fullscreen').addEventListener('click', toggleFullscreen);
   $('fs-exit').addEventListener('click', () => api.toggleFullscreen());
   for (const b of $$('.btn-sound')) b.addEventListener('click', () => void toggleSound());
+  for (const b of $$('.btn-info')) { b.innerHTML = icon('info'); b.title = `Device status and power (${MOD}D)`; b.addEventListener('click', () => devicePanel.toggle()); }
   for (const b of $$('.btn-shot')) { b.innerHTML = icon('camera'); b.title = `Screenshot (${MOD}C)`; b.addEventListener('click', () => void takeScreenshot()); }
   $('btn-record').addEventListener('click', () => void toggleRecording());
   $('btn-apps').addEventListener('click', toggleApps);
@@ -889,7 +897,7 @@ function wire(): void {
 
   bindKeyboard(api, {
     active: () => state.view !== 'home' && isRunning(),
-    menuOpen: () => state.menuOpen || apps.isOpen,
+    menuOpen: () => state.menuOpen || apps.isOpen || devicePanel.isOpen,
     flash: (code, down) => flashKey($('remote-buttons'), code, down),
     toggleFullscreen,
     toggleStats,
@@ -899,6 +907,7 @@ function wire(): void {
     toggleSound: () => void toggleSound(),
     screenshot: () => void takeScreenshot(),
     toggleRecording: () => void toggleRecording(),
+    toggleDevicePanel: () => devicePanel.toggle(),
   });
   $('stage').addEventListener('mousedown', () => $('stage').focus());
   $('stage').addEventListener('mousemove', showFsBar);

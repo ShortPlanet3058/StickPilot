@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 import net from 'net';
 import os from 'os';
 import { adb, DeviceTracker, RawDevice } from './adb';
-import type { DeviceInfo, DeviceKind, NetworkResult, ScanResult } from '../shared/types';
+import type { DeviceInfo, DeviceKind, DeviceStatusInfo, NetworkResult, ScanResult } from '../shared/types';
 
 interface Identity {
   hardwareId: string;
@@ -98,6 +98,48 @@ export class DeviceManager extends EventEmitter {
     } catch (e) {
       return { ok: false, message: humanizeConnectError((e as Error).message, host) };
     }
+  }
+
+  /** Live status for the device panel, in one shell round trip */
+  async statusInfo(serial: string): Promise<DeviceStatusInfo> {
+    const sep = '@@FTV@@';
+    const cmds = [
+      'df -k /data | tail -1',
+      'grep -E "MemTotal|MemAvailable" /proc/meminfo',
+      'dumpsys thermalservice 2>/dev/null | grep -m6 -E "Temperature\\{|Thermal Status|IsStatusOverride|Current temperatures"',
+      'dumpsys wifi 2>/dev/null | grep -m1 mWifiInfo',
+      'cat /proc/uptime',
+      'wm size',
+      'getprop ro.product.cpu.abi; nproc',
+      'dumpsys power | grep -m1 mWakefulness=',
+    ];
+    const out = await adb(['shell', cmds.join(`; echo ${sep}; `)], { serial, timeout: 10000 });
+    const [df, mem, thermal, wifi, uptime, wm, cpu, power] = out.split(sep).map((s) => s.trim());
+    const num = (re: RegExp, s: string) => { const m = re.exec(s); return m ? Number(m[1]) : null; };
+
+    const dfCols = df.split(/\s+/);
+    const storage = dfCols.length >= 4 && !Number.isNaN(Number(dfCols[1]))
+      ? { totalKB: Number(dfCols[1]), usedKB: Number(dfCols[2]), freeKB: Number(dfCols[3]) } : null;
+    const totalKB = num(/MemTotal:\s+(\d+)/, mem);
+    const availableKB = num(/MemAvailable:\s+(\d+)/, mem);
+    const cpuTemp = num(/mValue=([\d.]+), mType=0/, thermal);
+    const rssi = num(/RSSI: (-?\d+)/, wifi);
+    const [abi = '', cores = ''] = cpu.split('\n').map((s) => s.trim());
+    return {
+      storage,
+      memory: totalKB && availableKB ? { totalKB, availableKB } : null,
+      cpuTemp: cpuTemp === null ? null : Math.round(cpuTemp * 10) / 10,
+      // mStatus above 0 means the thermal service is limiting performance
+      throttled: /mType=0, mName=\w+, mStatus=[1-9]/.test(thermal),
+      wifi: rssi !== null && rssi > -127
+        ? { rssi, linkMbps: num(/Link speed: (\d+)Mbps/, wifi) ?? 0, freqMHz: num(/Frequency: (\d+)MHz/, wifi) ?? 0 } : null,
+      uptimeSec: num(/^([\d.]+)/, uptime),
+      screen: /(\d+x\d+)/.exec(wm)?.[1] ?? '',
+      ip: await this.deviceIp(serial),
+      abi,
+      cores: Number(cores) || null,
+      awake: /Awake/.test(power) ? true : /Asleep|Dozing/.test(power) ? false : null,
+    };
   }
 
   /** The device's own IP address on its Wi-Fi (or Ethernet) network */
