@@ -15,6 +15,9 @@ import { serverPath, SERVER_VERSION } from './paths';
 import type { AppInfo, Profile } from '../shared/types';
 
 const DEVICE_JAR = '/data/local/tmp/firetv-scrcpy-server.jar';
+// The server deletes its own file when it starts, so one-shot helpers (app and
+// encoder lists) use a separate copy that a starting session can't remove under them
+const HELPER_JAR = '/data/local/tmp/firetv-scrcpy-helper.jar';
 const FLAG_CONFIG = 1n << 62n;
 const FLAG_KEY = 1n << 61n;
 const PTS_MASK = (1n << 61n) - 1n;
@@ -22,28 +25,28 @@ const PTS_MASK = (1n << 61n) - 1n;
 const MSG_INJECT_KEYCODE = 0;
 const MSG_INJECT_TEXT = 1;
 
-async function pushServer(serial: string): Promise<void> {
-  await adb(['push', serverPath(), DEVICE_JAR], { serial });
+async function pushServer(serial: string, jar = DEVICE_JAR): Promise<void> {
+  await adb(['push', serverPath(), jar], { serial });
 }
 
-function serverArgs(scid: string, extra: string[]): string[] {
-  return ['shell', `CLASSPATH=${DEVICE_JAR}`, 'app_process', '/', 'com.genymobile.scrcpy.Server',
+function serverArgs(scid: string, extra: string[], jar = DEVICE_JAR): string[] {
+  return ['shell', `CLASSPATH=${jar}`, 'app_process', '/', 'com.genymobile.scrcpy.Server',
     SERVER_VERSION, `scid=${scid}`, 'log_level=info', ...extra];
 }
 
 /** Asks the server which H.264 encoders the device has; 'hardware' if any is not software */
 export async function detectEncoder(serial: string): Promise<'hardware' | 'software'> {
-  await pushServer(serial);
+  await pushServer(serial, HELPER_JAR);
   const scid = randomScid();
-  const out = await adb(serverArgs(scid, ['list_encoders=true', 'audio=false']), { serial, timeout: 15000 });
+  const out = await adb(serverArgs(scid, ['list_encoders=true', 'audio=false'], HELPER_JAR), { serial, timeout: 15000 });
   const h264 = out.split('\n').filter((l) => /--video-codec=h264/.test(l));
   return h264.some((l) => /\((hw|hybrid)\)/.test(l)) ? 'hardware' : 'software';
 }
 
 /** Installed apps with their display names, via the server's list_apps (the server knows labels) */
 export async function listApps(serial: string): Promise<AppInfo[]> {
-  await pushServer(serial);
-  const out = await adb(serverArgs(randomScid(), ['list_apps=true']), { serial, timeout: 30000 });
+  await pushServer(serial, HELPER_JAR);
+  const out = await adb(serverArgs(randomScid(), ['list_apps=true'], HELPER_JAR), { serial, timeout: 30000 });
   const apps: AppInfo[] = [];
   for (const line of out.split('\n')) {
     // " * Prime Video                    com.amazon.firebat"  (* = system app, - = installed by the user)
@@ -60,6 +63,7 @@ function randomScid(): string {
 export class Session extends EventEmitter {
   private server: ChildProcess | null = null;
   private video: net.Socket | null = null;
+  private audio: net.Socket | null = null;
   private control: net.Socket | null = null;
   private port: number | null = null;
   private config: Buffer | null = null;
@@ -72,8 +76,11 @@ export class Session extends EventEmitter {
     return !this.stopped;
   }
 
-  /** profile null = remote only: control channel, no video (no encoding on the device) */
-  async start(serial: string, profile: Profile | null): Promise<void> {
+  /**
+   * profile null = remote only: control channel, no video (no encoding on the device).
+   * audio: forward the device's sound (Opus). On Android 11-12 the device itself goes silent meanwhile.
+   */
+  async start(serial: string, profile: Profile | null, audio = false): Promise<void> {
     this.serial = serial;
     this.stopped = false;
     const scid = randomScid();
@@ -84,8 +91,9 @@ export class Session extends EventEmitter {
     const videoArgs = profile
       ? ['video=true', 'video_codec=h264', `max_size=${profile.size}`, `max_fps=${profile.fps}`, `video_bit_rate=${profile.bitrate}`]
       : ['video=false'];
+    const audioArgs = audio ? ['audio=true', 'audio_codec=opus', 'audio_bit_rate=128000'] : ['audio=false'];
     const server = spawnAdb(serverArgs(scid, [
-      'tunnel_forward=true', 'audio=false', 'control=true', ...videoArgs,
+      'tunnel_forward=true', ...audioArgs, 'control=true', ...videoArgs,
       'send_device_meta=false', 'send_stream_meta=false',
     ]), serial);
     this.server = server;
@@ -96,23 +104,25 @@ export class Session extends EventEmitter {
     server.on('exit', (code) => this.end(`The mirroring server stopped (code ${code}). ${lastError(log)}`.trim()));
 
     try {
-      // The first socket carries the dummy byte: video when mirroring, else control
-      if (profile) {
-        this.video = await this.connectFirst();
-        this.control = await this.connect();
-      } else {
-        this.control = await this.connectFirst();
-        this.control.resume();
+      // Sockets open in the server's order (video, audio, control); the first one
+      // carries the dummy byte
+      const order = [profile && 'video', audio && 'audio', 'control'].filter(Boolean) as ('video' | 'audio' | 'control')[];
+      for (const [i, kind] of order.entries()) {
+        const sock = i === 0 ? await this.connectFirst() : await this.connect();
+        this[kind] = sock;
       }
+      this.control!.resume();
     } catch (e) {
       const reason = `${(e as Error).message}. ${lastError(log)}`.trim();
       await this.stop();
       throw new Error(reason);
     }
-    this.control.on('data', () => {}); // device messages (clipboard etc.) are not used yet
-    this.control.on('error', () => {});
-    this.control.on('close', () => this.end('The connection to the device closed.'));
+    const control = this.control!;
+    control.on('data', () => {}); // device messages (clipboard etc.) are not used yet
+    control.on('error', () => {});
+    control.on('close', () => this.end('The connection to the device closed.'));
     if (this.video) this.readVideo(this.video);
+    if (this.audio) this.readAudio(this.audio);
     this.streaming = true;
   }
 
@@ -160,6 +170,26 @@ export class Session extends EventEmitter {
       }
     });
     sock.on('close', () => this.end('The video stream closed.'));
+    sock.on('error', () => {});
+    sock.resume();
+  }
+
+  /** Same framing as video; the config packet is the Opus header. Audio failing never ends the session. */
+  private readAudio(sock: net.Socket): void {
+    let buf: Buffer = Buffer.alloc(0);
+    sock.on('data', (chunk: Buffer) => {
+      buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
+      while (buf.length >= 12) {
+        const size = buf.readUInt32BE(8);
+        if (buf.length < 12 + size) break;
+        const flags = buf.readBigUInt64BE(0);
+        const data = Buffer.from(buf.subarray(12, 12 + size));
+        buf = buf.subarray(12 + size);
+        if (flags & FLAG_CONFIG) this.emit('audio-config', { description: data });
+        else this.emit('audio-packet', { data, pts: Number(flags & PTS_MASK) });
+      }
+    });
+    sock.on('close', () => { if (!this.stopped) this.emit('audio-ended'); });
     sock.on('error', () => {});
     sock.resume();
   }
@@ -221,8 +251,9 @@ export class Session extends EventEmitter {
     this.stopped = true;
     this.streaming = false;
     this.video?.destroy();
+    this.audio?.destroy();
     this.control?.destroy();
-    this.video = this.control = null;
+    this.video = this.audio = this.control = null;
     this.server?.kill();
     this.server = null;
     this.config = null;

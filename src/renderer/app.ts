@@ -1,4 +1,5 @@
 import { AppsPanel, avatar, paintAvatars } from './apps';
+import { AudioPlayer } from './audio';
 import { icon } from './icons';
 import { bindKeyboard } from './keyboard';
 import { bindRemote, flashKey, isMac, layoutFor, MOD, renderRemote, triggerQuickSettings } from './remote';
@@ -343,6 +344,14 @@ function renderToolbars(): void {
   iconBtn.title = live ? 'Disconnect' : 'Connect';
   iconBtn.disabled = !live && (!d || d.state !== 'device');
 
+  const soundOn = !!state.settings?.audioEnabled;
+  for (const b of $$('.btn-sound')) {
+    b.innerHTML = icon(soundOn ? 'volumeUp' : 'mute');
+    b.setAttribute('aria-pressed', String(soundOn));
+    b.title = soundOn
+      ? `Sound plays on this computer; the TV is silent meanwhile. Click to send it back to the TV (${MOD}U)`
+      : `Play the sound on this computer (${MOD}U)`;
+  }
   $('btn-stats').setAttribute('aria-pressed', String(!!state.settings?.showStats));
   $('btn-remote').setAttribute('aria-pressed', String(state.settings?.remoteVisible !== false));
   $('btn-pin').setAttribute('aria-pressed', String(!!state.settings?.remoteOnTop));
@@ -455,6 +464,7 @@ function renderRemotePanel(): void {
     ...(kind === 'firetv' ? [[`${MOD}Q`, 'Quick settings']] as [string, string][] : []),
     [`${MOD}Space`, 'Play / Pause'], [`${MOD}← ${MOD}→`, 'Rewind / Forward'],
     [`${MOD}↑ ${MOD}↓`, 'Volume'], [`${MOD}0`, 'Mute'],
+    [`${MOD}A`, 'Apps'], [`${MOD}U`, 'Sound on this computer'],
     [`${MOD}V`, 'Paste clipboard'], [`${MOD}F`, 'Fullscreen'],
   ];
   $('shortcuts').innerHTML = rows.map(([k, v]) =>
@@ -614,6 +624,40 @@ function toggleApps(): void {
   apps.toggle();
 }
 
+// ---------- Sound ----------
+
+const audio = new AudioPlayer(api);
+audio.onEnded = () => {
+  if (state.settings?.audioEnabled && state.status.state === 'running') {
+    toast('The device stopped sending sound. It may not support sound forwarding.', { kind: 'error' });
+  }
+};
+
+async function toggleSound(): Promise<void> {
+  if (!state.settings) return;
+  const on = !state.settings.audioEnabled;
+  await saveSetting({ audioEnabled: on });
+  const serial = liveSerial();
+  const mode = liveMode();
+  if (on) toast('Sound now plays on this computer. The TV speakers stay silent until you turn it off.', { kind: 'info', ms: 6000 });
+  // The sound stream is chosen when the connection starts: reconnect to apply
+  if (serial && mode) await connect(serial, mode);
+}
+
+/** Warns when the picture lags while sound is on, and offers to turn it off */
+const lagWatch = { seconds: 0, warnedAt: 0 };
+function watchLag(): void {
+  const s = state.status;
+  if (s.state !== 'running' || !s.audio || s.mode !== 'mirror') { lagWatch.seconds = 0; return; }
+  lagWatch.seconds = video.lastLagMs > 150 ? lagWatch.seconds + 1 : 0;
+  if (lagWatch.seconds >= 4 && Date.now() - lagWatch.warnedAt > 60_000) {
+    lagWatch.warnedAt = Date.now();
+    toast('The picture is lagging behind. Turning off sound may help.', {
+      kind: 'error', ms: 10000, action: { label: 'Turn off sound', run: () => void toggleSound() },
+    });
+  }
+}
+
 // ---------- Video & fullscreen ----------
 
 const video = new Video($<HTMLCanvasElement>('screen'), api);
@@ -622,8 +666,9 @@ video.onFirstFrame = () => render();
 setInterval(() => {
   const show = !!state.settings?.showStats && video.hasFrame && state.view === 'player';
   $('stats').hidden = !show;
-  const text = video.takeStats();
+  const text = video.takeStats() + (audio.active ? `\nsound   ${audio.bufferedMs().toFixed(0).padStart(4)} ms buffered` : '');
   if (show) $('stats').textContent = text;
+  watchLag();
 }, 1000);
 
 let fsTimer: number | undefined;
@@ -704,6 +749,7 @@ function wire(): void {
   $('btn-remote').addEventListener('click', toggleRemote);
   $('btn-fullscreen').addEventListener('click', toggleFullscreen);
   $('fs-exit').addEventListener('click', () => api.toggleFullscreen());
+  for (const b of $$('.btn-sound')) b.addEventListener('click', () => void toggleSound());
   $('btn-apps').addEventListener('click', toggleApps);
   $('btn-apps-compact').addEventListener('click', toggleApps);
   $('fav-apps').addEventListener('click', (e) => {
@@ -749,6 +795,7 @@ function wire(): void {
     toggleRemote,
     quickSettings,
     toggleApps,
+    toggleSound: () => void toggleSound(),
   });
   $('stage').addEventListener('mousedown', () => $('stage').focus());
   $('stage').addEventListener('mousemove', showFsBar);
@@ -765,7 +812,7 @@ function wire(): void {
     const wasMode = liveMode();
     state.status = s;
     if (s.state === 'running' && favoritesFor(s.serial).length) void apps.load(false);
-    if (s.state !== 'running') apps.close();
+    if (s.state !== 'running') { apps.close(); audio.stop(); }
     if (s.state !== 'running' || s.mode !== 'mirror') video.clear();
     else if (wasLive !== s.serial || wasMode !== 'mirror') video.hasFrame = false;
     render();

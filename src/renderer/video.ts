@@ -10,6 +10,8 @@ export class Video {
   private submitted = new Map<number, { t: number; lagMs: number }>();
   private stats = { frames: 0, decodeMs: [] as number[], lagMs: [] as number[], dropped: 0 };
   hasFrame = false;
+  /** Median lag of the last full second, for the lag watchdog */
+  lastLagMs = 0;
   onFirstFrame: () => void = () => {};
 
   constructor(private canvas: HTMLCanvasElement, api: FireTvApi) {
@@ -70,6 +72,7 @@ export class Video {
     const s = this.stats;
     const median = (a: number[]) => (a.length ? [...a].sort((x, y) => x - y)[Math.floor(a.length / 2)] : 0);
     const size = `${this.canvas.width}×${this.canvas.height}`;
+    this.lastLagMs = s.frames ? median(s.lagMs) : 0;
     // The device only sends frames when the screen changes
     const text = s.frames === 0
       ? `idle    ${size}\nscreen is still, no new frames`

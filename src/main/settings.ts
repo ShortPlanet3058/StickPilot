@@ -13,6 +13,7 @@ const DEFAULTS: Settings = {
   homeTab: 'firetv',
   remoteOnTop: false,
   favoriteApps: {},
+  audioEnabled: false,
 };
 
 const file = () => path.join(app.getPath('userData'), 'settings.json');

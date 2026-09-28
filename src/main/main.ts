@@ -58,6 +58,9 @@ async function profilesFor(serial: string): Promise<ProfileSet> {
 
 session.on('config', (c) => send('video:config', c));
 session.on('packet', (p) => send('video:packet', p));
+session.on('audio-config', (c) => send('audio:config', c));
+session.on('audio-packet', (p) => send('audio:packet', p));
+session.on('audio-ended', () => send('audio:ended', null));
 session.on('log', (line: string) => { if (process.env.FIRETV_DEBUG) process.stdout.write(`[server] ${line}`); });
 session.on('ended', (reason: string) => {
   if (status.state === 'running') setStatus({ state: 'ended', serial: status.serial, reason, cause: 'error' });
@@ -70,10 +73,11 @@ async function start(serial: string, profileId: string, mode: SessionMode): Prom
   const set = await profilesFor(serial);
   const profile = set.profiles.find((p) => p.id === profileId) || set.profiles.find((p) => p.id === set.defaultId)!;
   updateSettings({ lastSerial: serial, profileBySerial: { ...getSettings().profileBySerial, [serial]: profile.id } });
-  setStatus({ state: 'connecting', serial, profileId: profile.id, mode });
+  const audio = getSettings().audioEnabled;
+  setStatus({ state: 'connecting', serial, profileId: profile.id, mode, audio });
   try {
-    await session.start(serial, mode === 'mirror' ? profile : null);
-    setStatus({ state: 'running', serial, profileId: profile.id, mode });
+    await session.start(serial, mode === 'mirror' ? profile : null, audio);
+    setStatus({ state: 'running', serial, profileId: profile.id, mode, audio });
   } catch (e) {
     setStatus({ state: 'ended', serial, cause: 'error', reason: (e as Error).message });
     throw e;

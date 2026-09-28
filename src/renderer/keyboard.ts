@@ -15,6 +15,7 @@ export interface KeyboardHooks {
   toggleRemote(): void;
   quickSettings(): void;
   toggleApps(): void;
+  toggleSound(): void;
 }
 
 const HELD: Record<string, number> = {
@@ -55,6 +56,7 @@ export function bindKeyboard(api: FireTvApi, hooks: KeyboardHooks): void {
       const special: Record<string, () => void> = {
         KeyQ: hooks.quickSettings,
         KeyA: hooks.toggleApps,
+        KeyU: hooks.toggleSound,
         KeyF: hooks.toggleFullscreen,
         KeyI: hooks.toggleStats,
         KeyR: hooks.toggleRemote,

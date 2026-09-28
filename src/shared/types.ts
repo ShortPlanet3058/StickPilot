@@ -47,8 +47,8 @@ export type SessionMode = 'mirror' | 'remote';
 
 export type SessionStatus =
   | { state: 'idle' }
-  | { state: 'connecting'; serial: string; profileId: string; mode: SessionMode }
-  | { state: 'running'; serial: string; profileId: string; mode: SessionMode }
+  | { state: 'connecting'; serial: string; profileId: string; mode: SessionMode; audio: boolean }
+  | { state: 'running'; serial: string; profileId: string; mode: SessionMode; audio: boolean }
   | { state: 'ended'; serial: string; reason: string; cause: 'user' | 'unplugged' | 'error' };
 
 export interface Settings {
@@ -67,6 +67,8 @@ export interface Settings {
   remoteOnTop: boolean;
   /** Pinned apps (package names) per physical device (hardwareId) */
   favoriteApps: Record<string, string[]>;
+  /** Play the device's sound on this computer (the device goes silent meanwhile on Android 11-12) */
+  audioEnabled: boolean;
 }
 
 export interface VideoPacket {
@@ -116,6 +118,10 @@ export interface FireTvApi {
   onStatus(cb: (status: SessionStatus) => void): void;
   onConfig(cb: (config: { codec: string }) => void): void;
   onPacket(cb: (packet: VideoPacket) => void): void;
+  onAudioConfig(cb: (config: { description: Uint8Array }) => void): void;
+  onAudioPacket(cb: (packet: { data: Uint8Array; pts: number }) => void): void;
+  /** The device stopped sending sound (not supported, or capture failed) */
+  onAudioEnded(cb: () => void): void;
   key(keycode: number, action: 0 | 1, repeat?: number): void;
   /** Sends a single key press (down + up) */
   tap(keycode: number): void;
