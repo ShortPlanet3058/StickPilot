@@ -24,6 +24,7 @@ const PTS_MASK = (1n << 61n) - 1n;
 
 const MSG_INJECT_KEYCODE = 0;
 const MSG_INJECT_TEXT = 1;
+const MSG_RESET_VIDEO = 17; // restarts the encoder, which sends a fresh key frame at once
 
 async function pushServer(serial: string, jar = DEVICE_JAR): Promise<void> {
   await adb(['push', serverPath(), jar], { serial });
@@ -227,6 +228,10 @@ export class Session extends EventEmitter {
   tap(keycode: number): void {
     this.key(keycode, 0);
     this.key(keycode, 1);
+  }
+
+  resetVideo(): void {
+    this.control?.write(Buffer.from([MSG_RESET_VIDEO]));
   }
 
   text(str: string): void {

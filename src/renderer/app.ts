@@ -48,6 +48,8 @@ const state = {
   fullscreen: false,
   menuOpen: false,
   autoConnectTried: false,
+  /** Recording start time (ms), or 0 */
+  recordingSince: 0,
   remoteKind: null as DeviceKind | null,
 };
 
@@ -346,12 +348,20 @@ function renderToolbars(): void {
 
   const soundOn = !!state.settings?.audioEnabled;
   for (const b of $$('.btn-sound')) {
-    b.innerHTML = icon(soundOn ? 'volumeUp' : 'mute');
+    b.innerHTML = icon('headphones'); // distinct from the remote's Mute key
     b.setAttribute('aria-pressed', String(soundOn));
     b.title = soundOn
       ? `Sound plays on this computer; the TV is silent meanwhile. Click to send it back to the TV (${MOD}U)`
       : `Play the sound on this computer (${MOD}U)`;
   }
+  const rec = $('btn-record');
+  rec.classList.toggle('recording', !!state.recordingSince);
+  rec.innerHTML = state.recordingSince
+    ? `${icon('stop', 16)}<span class="rec-time">${formatDuration((Date.now() - state.recordingSince) / 1000)}</span>`
+    : icon('record');
+  rec.title = state.recordingSince ? `Stop recording (${MOD}⇧C)` : `Record the screen (${MOD}⇧C)`;
+  ($('btn-record') as HTMLButtonElement).disabled = !(isRunning() && liveMode() === 'mirror');
+  for (const b of $$<HTMLButtonElement>('.btn-shot')) b.disabled = !(d && d.state === 'device');
   $('btn-stats').setAttribute('aria-pressed', String(!!state.settings?.showStats));
   $('btn-remote').setAttribute('aria-pressed', String(state.settings?.remoteVisible !== false));
   $('btn-pin').setAttribute('aria-pressed', String(!!state.settings?.remoteOnTop));
@@ -465,6 +475,7 @@ function renderRemotePanel(): void {
     [`${MOD}Space`, 'Play / Pause'], [`${MOD}← ${MOD}→`, 'Rewind / Forward'],
     [`${MOD}↑ ${MOD}↓`, 'Volume'], [`${MOD}0`, 'Mute'],
     [`${MOD}A`, 'Apps'], [`${MOD}U`, 'Sound on this computer'],
+    [`${MOD}C`, 'Screenshot'], [`${MOD}⇧C`, 'Record the screen'],
     [`${MOD}V`, 'Paste clipboard'], [`${MOD}F`, 'Fullscreen'],
   ];
   $('shortcuts').innerHTML = rows.map(([k, v]) =>
@@ -624,6 +635,40 @@ function toggleApps(): void {
   apps.toggle();
 }
 
+// ---------- Screenshots and recording ----------
+
+const formatDuration = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+
+async function takeScreenshot(): Promise<void> {
+  const d = device(state.current);
+  if (!d || d.state !== 'device') return;
+  const r = await api.screenshot(d.serial);
+  if (r.ok && r.file) toast('Screenshot saved to Pictures › Fire TV.', { kind: 'ok', action: { label: 'Show', run: () => api.showInFolder(r.file!) } });
+  else toast(r.message ?? 'The screenshot failed.', { kind: 'error' });
+}
+
+function recordingSaved(r: { file: string; seconds: number } | null): void {
+  state.recordingSince = 0;
+  render();
+  if (r) toast(`Recording saved (${formatDuration(r.seconds)}) to Movies › Fire TV.`, { kind: 'ok', ms: 8000, action: { label: 'Show', run: () => api.showInFolder(r.file) } });
+}
+
+async function toggleRecording(): Promise<void> {
+  if (state.recordingSince) { recordingSaved(await api.stopRecording()); return; }
+  if (!isRunning() || liveMode() !== 'mirror') return;
+  const canvas = $<HTMLCanvasElement>('screen');
+  try {
+    await api.startRecording(canvas.width, canvas.height);
+    state.recordingSince = Date.now();
+    render();
+  } catch (e) {
+    toast((e as Error).message.replace(/^Error invoking remote method '[\w:]+': Error: /, ''), { kind: 'error' });
+  }
+}
+
+setInterval(() => { if (state.recordingSince && state.view === 'player') renderToolbars(); }, 1000);
+api.onRecordingStopped(recordingSaved);
+
 // ---------- Sound ----------
 
 const audio = new AudioPlayer(api);
@@ -750,6 +795,8 @@ function wire(): void {
   $('btn-fullscreen').addEventListener('click', toggleFullscreen);
   $('fs-exit').addEventListener('click', () => api.toggleFullscreen());
   for (const b of $$('.btn-sound')) b.addEventListener('click', () => void toggleSound());
+  for (const b of $$('.btn-shot')) { b.innerHTML = icon('camera'); b.title = `Screenshot (${MOD}C)`; b.addEventListener('click', () => void takeScreenshot()); }
+  $('btn-record').addEventListener('click', () => void toggleRecording());
   $('btn-apps').addEventListener('click', toggleApps);
   $('btn-apps-compact').addEventListener('click', toggleApps);
   $('fav-apps').addEventListener('click', (e) => {
@@ -796,6 +843,8 @@ function wire(): void {
     quickSettings,
     toggleApps,
     toggleSound: () => void toggleSound(),
+    screenshot: () => void takeScreenshot(),
+    toggleRecording: () => void toggleRecording(),
   });
   $('stage').addEventListener('mousedown', () => $('stage').focus());
   $('stage').addEventListener('mousemove', showFsBar);

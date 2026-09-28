@@ -1,10 +1,13 @@
-import { app, BrowserWindow, clipboard, ipcMain } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, shell } from 'electron';
+import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { DeviceManager, normalizeHost } from './devices';
 import { profileSetFor } from './profiles';
 import { detectEncoder, listApps, Session } from './scrcpy';
 import { flushSettings, getSettings, updateSettings } from './settings';
+import { adbPath } from './paths';
+import { Recorder } from './recorder';
 import { TrayRemote } from './tray';
 import { Typer } from './typing';
 import { adb } from './adb';
@@ -14,6 +17,9 @@ let win: BrowserWindow | null = null;
 const devices = new DeviceManager();
 const session = new Session();
 const typer = new Typer(session);
+const recorder = new Recorder();
+// Development aid: with FIRETV_DEBUG, scripts/main-eval.mjs can reach these objects
+if (process.env.FIRETV_DEBUG) Object.assign(globalThis, { __firetv: { session, recorder, devices } });
 const encoderBySerial = new Map<string, 'hardware' | 'software'>();
 let status: SessionStatus = { state: 'idle' };
 
@@ -28,6 +34,8 @@ function sendAll(channel: string, payload: unknown): void {
 }
 
 function setStatus(next: SessionStatus): void {
+  // A recording belongs to one mirroring session; any change ends it
+  if (recorder.active && !(next.state === 'running' && next.mode === 'mirror')) send('record:stopped', recorder.stop());
   status = next;
   sendAll('session:status', status);
   const notice = tray.updateMediaKeys(status.state === 'running');
@@ -66,7 +74,7 @@ async function profilesFor(serial: string): Promise<ProfileSet> {
 // ---- Session
 
 session.on('config', (c) => send('video:config', c));
-session.on('packet', (p) => send('video:packet', p));
+session.on('packet', (p) => { send('video:packet', p); recorder.push(p.data, p.key, p.pts); });
 session.on('audio-config', (c) => send('audio:config', c));
 session.on('audio-packet', (p) => send('audio:packet', p));
 session.on('audio-ended', () => send('audio:ended', null));
@@ -167,6 +175,39 @@ ipcMain.handle('session:connectRemote', async (_e, serial?: string) => {
   await start(target, getSettings().profileBySerial[target] ?? '', 'remote');
 });
 ipcMain.on('window:showMain', () => showMain());
+
+// ---- Screenshots and recordings
+
+function mediaFile(kind: 'pictures' | 'videos', ext: string): string {
+  const dir = path.join(app.getPath(kind), 'Fire TV');
+  fs.mkdirSync(dir, { recursive: true });
+  const d = new Date();
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} at ${p2(d.getHours())}.${p2(d.getMinutes())}.${p2(d.getSeconds())}`;
+  return path.join(dir, `Fire TV ${stamp}.${ext}`);
+}
+
+// screencap runs on the device at its full resolution, whatever the streaming profile
+ipcMain.handle('capture:screenshot', (_e, serial: string) => new Promise((resolve) => {
+  execFile(adbPath(), ['-s', serial, 'exec-out', 'screencap', '-p'], { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 15000 },
+    (err, stdout) => {
+      if (err || stdout.length < 100 || stdout.readUInt32BE(0) !== 0x89504e47) {
+        resolve({ ok: false, message: 'The device did not return a screenshot.' });
+        return;
+      }
+      const file = mediaFile('pictures', 'png');
+      fs.writeFileSync(file, stdout);
+      resolve({ ok: true, file });
+    });
+}));
+ipcMain.handle('record:start', (_e, width: number, height: number) => {
+  if (status.state !== 'running' || status.mode !== 'mirror') throw new Error('Recording needs the picture to be showing.');
+  if (recorder.active) return;
+  recorder.start(mediaFile('videos', 'mp4'), width, height);
+  session.resetVideo(); // start on a fresh key frame now instead of waiting up to 10 s
+});
+ipcMain.handle('record:stop', () => recorder.stop());
+ipcMain.on('shell:showItem', (_e, file: string) => shell.showItemInFolder(file));
 ipcMain.on('key', (_e, keycode: number, action: 0 | 1, repeat: number) => {
   session.key(keycode, action, repeat);
   typer.invalidate(); // navigation may have changed the focused screen

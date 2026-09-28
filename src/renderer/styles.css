@@ -565,10 +565,15 @@ body.fullscreen .fs-bar.visible { opacity: 1; transform: translate(-50%, 0); poi
 /* ---------- Remote-only view (compact window) ---------- */
 
 #remote-view { display: flex; flex-direction: column; outline: none; background: var(--surface); }
-.toolbar.compact { gap: 2px; padding-right: 8px; }
-body.mac .toolbar.compact { padding-left: 76px; }
-.toolbar.compact .switch-btn span { max-width: 140px; }
-.remote-status { flex: none; padding: 8px 20px 0; font-size: 12px; }
+.compact-head { flex: none; border-bottom: 1px solid var(--border); background: var(--surface); }
+/* first row shares its height with the macOS traffic lights */
+.compact-actions { display: flex; justify-content: flex-end; gap: 2px; height: 38px; padding: 4px 8px 0 80px; }
+body:not(.mac) .compact-actions { padding-left: 8px; }
+.compact-title { display: flex; align-items: center; gap: 2px; min-width: 0; padding: 0 12px 8px 6px; }
+.compact-title .switcher { flex: 1; min-width: 0; }
+.compact-title .switch-btn { max-width: 100%; }
+.compact-title .switch-btn span { max-width: none; min-width: 0; }
+.remote-status { flex: none; padding: 10px 20px 0; font-size: 12px; }
 .remote-overlay { display: none; }
 #remote-view.has-card .remote-overlay { flex: 1; display: flex; align-items: center; justify-content: center; padding: 16px; }
 #remote-view.has-card .remote-slot { display: none; }
@@ -735,3 +740,8 @@ body.tray-page { display: flex; flex-direction: column; height: 100vh; backgroun
 .tray-idle { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; text-align: center; color: var(--muted); }
 .tray-idle b { color: var(--text); font-weight: 500; }
 .tray-foot { flex: none; display: flex; justify-content: center; padding: 4px 12px 12px; }
+
+/* Recording button: red with a running timer */
+#btn-record.recording { width: auto; padding: 0 10px; gap: 6px; color: #fff; background: #dc2626; }
+#btn-record.recording:hover { background: #b91c1c; }
+.rec-time { font-size: 12px; font-variant-numeric: tabular-nums; }

@@ -16,6 +16,8 @@ export interface KeyboardHooks {
   quickSettings(): void;
   toggleApps(): void;
   toggleSound(): void;
+  screenshot(): void;
+  toggleRecording(): void;
 }
 
 const HELD: Record<string, number> = {
@@ -62,6 +64,11 @@ export function bindKeyboard(api: FireTvApi, hooks: KeyboardHooks): void {
         KeyR: hooks.toggleRemote,
         KeyV: () => api.pasteClipboard(),
       };
+      if (e.code === 'KeyC') {
+        e.preventDefault();
+        if (!e.repeat) (e.shiftKey ? hooks.toggleRecording : hooks.screenshot)();
+        return;
+      }
       if (special[e.code]) { e.preventDefault(); if (!e.repeat) special[e.code](); return; }
       const code = MOD_KEYS[e.code];
       if (code === undefined) return;

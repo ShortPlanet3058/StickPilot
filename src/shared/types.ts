@@ -144,6 +144,14 @@ export interface FireTvApi {
   /** Remote-only connection to the given device, or to the last used one */
   connectRemote(serial?: string): Promise<void>;
   showMainWindow(): void;
+  /** Full-resolution screenshot taken on the device, saved to Pictures/Fire TV */
+  screenshot(serial: string): Promise<{ ok: boolean; file?: string; message?: string }>;
+  /** Records the incoming video to Movies/Fire TV (mirroring only) */
+  startRecording(width: number, height: number): Promise<void>;
+  stopRecording(): Promise<{ file: string; seconds: number } | null>;
+  /** The recording ended on its own (disconnected, profile changed) */
+  onRecordingStopped(cb: (result: { file: string; seconds: number } | null) => void): void;
+  showInFolder(file: string): void;
   /** Messages from the main process to show as notices (e.g. media key permission) */
   onNotice(cb: (message: string) => void): void;
   getSettings(): Promise<Settings>;

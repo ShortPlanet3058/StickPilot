@@ -17,5 +17,8 @@
     "electron": "^44.4.5",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
+  },
+  "dependencies": {
+    "mp4-muxer": "^5.2.2"
   }
 }

@@ -65,6 +65,8 @@ bindKeyboard(api, {
   quickSettings: () => triggerQuickSettings($('t-remote'), api),
   toggleApps: () => api.showMainWindow(),
   toggleSound: () => {},
+  screenshot: () => {},
+  toggleRecording: () => {},
 });
 
 $('t-open').addEventListener('click', () => api.showMainWindow());

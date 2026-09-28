@@ -34,6 +34,8 @@
       <div class="toolbar-spacer"></div>
       <div id="profile-picker" class="segmented no-drag" role="radiogroup" aria-label="Quality profile"></div>
       <div class="toolbar-actions no-drag">
+        <button id="btn-record" class="icon-btn"></button>
+        <button class="icon-btn btn-shot"></button>
         <button id="btn-sound" class="icon-btn btn-sound" aria-pressed="false"></button>
         <button id="btn-apps" class="icon-btn"></button>
         <button id="btn-remote-only" class="icon-btn"></button>
@@ -60,18 +62,21 @@
 
   <!-- Remote only: control without the picture, in a compact window -->
   <section id="remote-view" class="view" aria-label="Remote" hidden tabindex="-1">
-    <header class="toolbar compact drag">
-      <button class="icon-btn nav-home" title="All devices"></button>
-      <div class="switcher no-drag">
-        <button class="switch-btn" aria-haspopup="menu" aria-expanded="false"></button>
-      </div>
-      <div class="toolbar-spacer"></div>
-      <div class="toolbar-actions no-drag">
+    <!-- Two rows: the window is too narrow for the name and all actions side by side -->
+    <header class="compact-head drag">
+      <div class="compact-actions no-drag">
+        <button class="icon-btn btn-shot"></button>
         <button class="icon-btn btn-sound" aria-pressed="false"></button>
         <button id="btn-apps-compact" class="icon-btn"></button>
         <button id="btn-pin" class="icon-btn" aria-pressed="false"></button>
         <button id="btn-show-screen" class="icon-btn"></button>
         <button class="icon-btn btn-connect-icon"></button>
+      </div>
+      <div class="compact-title">
+        <button class="icon-btn nav-home no-drag" title="All devices"></button>
+        <div class="switcher no-drag">
+          <button class="switch-btn" aria-haspopup="menu" aria-expanded="false"></button>
+        </div>
       </div>
     </header>
     <p class="remote-status muted" data-bind="status"></p>
