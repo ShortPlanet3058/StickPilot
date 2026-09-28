@@ -31,6 +31,10 @@ const api: FireTvApi = {
   setCompact: (on) => ipcRenderer.send('window:compact', on),
   setAlwaysOnTop: (on) => ipcRenderer.send('window:onTop', on),
   onFullscreen: (cb) => { ipcRenderer.on('window:fullscreen', (_e, on) => cb(on)); },
+  getStatus: () => ipcRenderer.invoke('session:status'),
+  connectRemote: (serial) => ipcRenderer.invoke('session:connectRemote', serial),
+  showMainWindow: () => ipcRenderer.send('window:showMain'),
+  onNotice: (cb) => { ipcRenderer.on('notice', (_e, m) => cb(m)); },
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
 };

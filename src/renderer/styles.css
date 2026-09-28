@@ -719,3 +719,19 @@ button.link:hover { background: none; text-decoration: underline; }
 .fav-apps.empty .fav.all { flex-direction: row; justify-content: center; height: 34px; padding: 0 10px; background: var(--surface-2); color: var(--text); font-size: 12px; }
 .fav-apps.empty .fav.all .icon { width: 16px; height: 16px; padding: 0; background: none; }
 #remote.disabled .fav-apps { opacity: 0.4; pointer-events: none; }
+
+/* ---------- Menu-bar mini remote ---------- */
+
+body.tray-page { display: flex; flex-direction: column; height: 100vh; background: var(--surface); }
+.tray-head { flex: none; display: flex; align-items: center; justify-content: space-between; padding: 12px 10px 4px 16px; }
+.tray-title { display: flex; align-items: center; gap: 10px; min-width: 0; font-weight: 600; }
+.tray-title span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tray-remote { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 6px 16px; }
+.tray-remote .key-row button { height: 50px; }
+.dpad.small { width: 164px; height: 164px; }
+.dpad.small .dpad-up, .dpad.small .dpad-down { left: 52px; width: 60px; height: 52px; }
+.dpad.small .dpad-left, .dpad.small .dpad-right { top: 52px; width: 52px; height: 60px; }
+.dpad.small .dpad-ok { width: 64px; height: 64px; }
+.tray-idle { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; text-align: center; color: var(--muted); }
+.tray-idle b { color: var(--text); font-weight: 500; }
+.tray-foot { flex: none; display: flex; justify-content: center; padding: 4px 12px 12px; }

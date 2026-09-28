@@ -5,6 +5,7 @@ import { DeviceManager, normalizeHost } from './devices';
 import { profileSetFor } from './profiles';
 import { detectEncoder, listApps, Session } from './scrcpy';
 import { flushSettings, getSettings, updateSettings } from './settings';
+import { TrayRemote } from './tray';
 import { Typer } from './typing';
 import { adb } from './adb';
 import type { AppInfo, ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
@@ -16,19 +17,27 @@ const typer = new Typer(session);
 const encoderBySerial = new Map<string, 'hardware' | 'software'>();
 let status: SessionStatus = { state: 'idle' };
 
+/** To the main window only (video and sound) */
 function send(channel: string, payload: unknown): void {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);
 }
 
+/** To every window, including the menu-bar remote (status, devices, notices) */
+function sendAll(channel: string, payload: unknown): void {
+  for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload);
+}
+
 function setStatus(next: SessionStatus): void {
   status = next;
-  send('session:status', status);
+  sendAll('session:status', status);
+  const notice = tray.updateMediaKeys(status.state === 'running');
+  if (notice) sendAll('notice', notice);
 }
 
 // ---- Devices
 
 devices.on('changed', (list) => {
-  send('devices:changed', list);
+  sendAll('devices:changed', list);
   // The mirrored device disappeared (unplugged, network drop, TV turned off)
   const s = status;
   if ((s.state === 'running' || s.state === 'connecting')
@@ -152,6 +161,12 @@ ipcMain.handle('session:stop', async () => {
   setStatus(serial ? { state: 'ended', serial, cause: 'user', reason: '' } : { state: 'idle' });
 });
 ipcMain.handle('session:status', () => status);
+ipcMain.handle('session:connectRemote', async (_e, serial?: string) => {
+  const target = serial || getSettings().lastSerial;
+  if (!target) throw new Error('No device used yet.');
+  await start(target, getSettings().profileBySerial[target] ?? '', 'remote');
+});
+ipcMain.on('window:showMain', () => showMain());
 ipcMain.on('key', (_e, keycode: number, action: 0 | 1, repeat: number) => {
   session.key(keycode, action, repeat);
   typer.invalidate(); // navigation may have changed the focused screen
@@ -211,6 +226,15 @@ function createWindow(): void {
     },
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  // Closing the window keeps the app in the menu bar. Nobody sees the picture any
+  // more, so a mirroring session drops to remote only (no encoding on the device).
+  win.on('close', (e) => {
+    if (quitting) return;
+    e.preventDefault();
+    if (win?.isFullScreen()) win.setFullScreen(false);
+    win?.hide();
+    if (status.state === 'running' && status.mode === 'mirror') void start(status.serial, status.profileId, 'remote').catch(() => {});
+  });
   win.on('enter-full-screen', () => send('window:fullscreen', true));
   win.on('leave-full-screen', () => send('window:fullscreen', false));
 
@@ -224,16 +248,49 @@ function createWindow(): void {
   }
 }
 
+// ---- Menu-bar remote and window lifecycle
+
+let quitting = false;
+
+const tray = new TrayRemote({
+  preload: path.join(__dirname, '..', 'preload', 'preload.js'),
+  page: path.join(__dirname, '..', 'renderer', 'tray.html'),
+  showMain: () => showMain(),
+  quit: () => app.quit(),
+  tap: (code) => { if (status.state !== 'running') return false; session.tap(code); return true; },
+  mediaKeysEnabled: () => getSettings().mediaKeys,
+  setMediaKeys: (on) => {
+    updateSettings({ mediaKeys: on });
+    const notice = tray.updateMediaKeys(status.state === 'running');
+    if (notice) sendAll('notice', notice);
+  },
+});
+
+function showMain(): void {
+  if (!win || win.isDestroyed()) createWindow();
+  win!.show();
+  win!.focus();
+}
+
+app.on('before-quit', () => { quitting = true; });
+app.on('activate', () => showMain());
+
 app.whenReady().then(async () => {
   createWindow();
+  tray.create();
   await devices.start();
   // Reconnect remembered network devices quietly; failures just leave them absent
   for (const host of getSettings().networkHosts) void devices.connectNetwork(host);
 });
 
-app.on('window-all-closed', async () => {
-  await session.stop();
+app.on('will-quit', (e) => {
+  // Stop the device-side server before exiting
+  if (session.active) {
+    e.preventDefault();
+    void session.stop().then(() => app.quit());
+    return;
+  }
   devices.stop();
+  tray.destroy();
   flushSettings();
-  app.quit();
 });

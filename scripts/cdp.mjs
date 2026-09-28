@@ -5,7 +5,9 @@ import { writeFileSync } from 'fs';
 
 const [cmd, arg] = process.argv.slice(2);
 const targets = await (await fetch('http://127.0.0.1:9223/json')).json();
-const page = targets.find((t) => t.type === 'page');
+// CDP_PAGE=tray.html picks the menu-bar remote instead of the main window
+const want = process.env.CDP_PAGE || 'index.html';
+const page = targets.find((t) => t.type === 'page' && t.url.includes(want)) ?? targets.find((t) => t.type === 'page');
 const ws = new WebSocket(page.webSocketDebuggerUrl);
 await new Promise((r) => ws.addEventListener('open', r, { once: true }));
 let id = 0;

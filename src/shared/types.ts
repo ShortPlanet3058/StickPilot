@@ -69,6 +69,8 @@ export interface Settings {
   favoriteApps: Record<string, string[]>;
   /** Play the device's sound on this computer (the device goes silent meanwhile on Android 11-12) */
   audioEnabled: boolean;
+  /** Media keys (play/pause, previous, next) control the device while connected */
+  mediaKeys: boolean;
 }
 
 export interface VideoPacket {
@@ -138,6 +140,12 @@ export interface FireTvApi {
   setCompact(on: boolean): void;
   setAlwaysOnTop(on: boolean): void;
   onFullscreen(cb: (on: boolean) => void): void;
+  getStatus(): Promise<SessionStatus>;
+  /** Remote-only connection to the given device, or to the last used one */
+  connectRemote(serial?: string): Promise<void>;
+  showMainWindow(): void;
+  /** Messages from the main process to show as notices (e.g. media key permission) */
+  onNotice(cb: (message: string) => void): void;
   getSettings(): Promise<Settings>;
   setSettings(patch: Partial<Settings>): Promise<void>;
 }

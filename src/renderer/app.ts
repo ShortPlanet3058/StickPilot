@@ -813,10 +813,17 @@ function wire(): void {
     state.status = s;
     if (s.state === 'running' && favoritesFor(s.serial).length) void apps.load(false);
     if (s.state !== 'running') { apps.close(); audio.stop(); }
+    // The session may change mode from outside this window (menu-bar remote, window closed)
+    if (s.state === 'running' && s.serial === state.current) {
+      if (s.mode === 'remote' && state.view === 'player') { setView('remote'); return; }
+      if (s.mode === 'mirror' && state.view === 'remote') { setView('player'); return; }
+    }
+    if (s.state === 'running' && state.view === 'home' && !state.current) state.current = s.serial;
     if (s.state !== 'running' || s.mode !== 'mirror') video.clear();
     else if (wasLive !== s.serial || wasMode !== 'mirror') video.hasFrame = false;
     render();
   });
+  api.onNotice((m) => toast(m, { kind: 'info', ms: 9000 }));
   api.onFullscreen((on) => {
     state.fullscreen = on;
     document.body.classList.toggle('fullscreen', on);

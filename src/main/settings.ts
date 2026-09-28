@@ -14,6 +14,7 @@ const DEFAULTS: Settings = {
   remoteOnTop: false,
   favoriteApps: {},
   audioEnabled: false,
+  mediaKeys: false,
 };
 
 const file = () => path.join(app.getPath('userData'), 'settings.json');
