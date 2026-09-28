@@ -5,7 +5,7 @@ import { cpSync, mkdirSync, rmSync } from 'fs';
 const watch = process.argv.includes('--watch');
 rmSync('dist', { recursive: true, force: true });
 mkdirSync('dist/renderer', { recursive: true });
-for (const f of ['index.html', 'tray.html', 'styles.css']) cpSync(`src/renderer/${f}`, `dist/renderer/${f}`);
+for (const f of ['index.html', 'tray.html', 'styles.css', 'logo.png']) cpSync(`src/renderer/${f}`, `dist/renderer/${f}`);
 
 const common = { bundle: true, sourcemap: true, logLevel: 'info', target: 'es2022' };
 const configs = [

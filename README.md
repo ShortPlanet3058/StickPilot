@@ -59,6 +59,12 @@ evaluates code in the main process (`STICKPILOT_DEBUG=1` also exposes `globalThi
 The server protocol changes between scrcpy versions, so the client is pinned to the bundled
 server version (`SERVER_VERSION` in `src/main/paths.ts`).
 
+## Icons
+
+`assets/logo-source.png` is the logo artwork. `python3 scripts/make-icons.py` (needs Pillow) generates
+`assets/StickPilot.icns`, `assets/icon.ico`, `assets/icon.png`, `assets/icon-512.png` and the header
+logo `src/renderer/logo.png`. The menu-bar glyph is drawn in code (`src/main/trayIcon.ts`).
+
 ## Licenses
 
 scrcpy is Apache-2.0 (`vendor/scrcpy-LICENSE`). adb comes from Android SDK Platform-Tools; check its

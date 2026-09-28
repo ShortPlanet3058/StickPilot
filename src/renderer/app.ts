@@ -788,7 +788,7 @@ function showFsBar(): void {
 
 function wire(): void {
   document.body.classList.toggle('mac', isMac);
-  $('brand-icon').innerHTML = icon('tv', 20);
+  $('brand-icon').innerHTML = '<img src="logo.png" width="28" height="28" alt="">';
   for (const b of $$('.nav-home')) {
     b.innerHTML = b.classList.contains('icon-btn') ? icon('chevronLeft', 18) : `${icon('chevronLeft', 16)}<span>Devices</span>`;
     b.addEventListener('click', goHome);

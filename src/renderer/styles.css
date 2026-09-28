@@ -172,7 +172,7 @@ kbd {
 }
 body.mac .home-head { padding-left: max(88px, calc((100% - 1080px) / 2 + 32px)); }
 .brand { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
-.brand .icon { color: var(--accent); }
+.brand img { display: block; }
 
 .home-body { flex: 1; overflow-y: auto; }
 .home-content { max-width: 1080px; margin: 0 auto; padding: 8px 32px 40px; }
