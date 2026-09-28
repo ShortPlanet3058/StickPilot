@@ -15,7 +15,7 @@ function bundledRoot(): string {
 }
 
 function localScrcpyDir(): string {
-  return process.env.FIRETV_SCRCPY_DIR
+  return process.env.STICKPILOT_SCRCPY_DIR
     || path.join(os.homedir(), 'Documents/tools/scrcpy-macos-x86_64-v4.1');
 }
 
@@ -24,14 +24,14 @@ function firstExisting(candidates: string[]): string | undefined {
 }
 
 export function adbPath(): string {
-  return process.env.FIRETV_ADB
+  return process.env.STICKPILOT_ADB
     || firstExisting([path.join(bundledRoot(), PLATFORM_DIR, ADB_NAME), path.join(localScrcpyDir(), ADB_NAME)])
     || ADB_NAME; // last resort: adb on PATH
 }
 
 export function serverPath(): string {
   const found = firstExisting([path.join(bundledRoot(), 'scrcpy-server'), path.join(localScrcpyDir(), 'scrcpy-server')]);
-  if (!found) throw new Error('scrcpy-server not found. Run "npm run vendor" or set FIRETV_SCRCPY_DIR.');
+  if (!found) throw new Error('scrcpy-server not found. Run "npm run vendor" or set STICKPILOT_SCRCPY_DIR.');
   return found;
 }
 

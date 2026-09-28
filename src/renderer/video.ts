@@ -1,7 +1,7 @@
 // H.264 decoding with WebCodecs. Frames are drawn the moment they are decoded;
 // nothing is buffered, because buffering is exactly the lag we want to avoid.
 
-import type { FireTvApi } from '../shared/types';
+import type { StickPilotApi } from '../shared/types';
 
 export class Video {
   private ctx: CanvasRenderingContext2D;
@@ -14,7 +14,7 @@ export class Video {
   lastLagMs = 0;
   onFirstFrame: () => void = () => {};
 
-  constructor(private canvas: HTMLCanvasElement, api: FireTvApi) {
+  constructor(private canvas: HTMLCanvasElement, api: StickPilotApi) {
     this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })!;
     api.onConfig(({ codec }) => this.configure(codec));
     api.onPacket(({ data, key, pts, lagMs }) => {

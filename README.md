@@ -1,4 +1,4 @@
-# Fire TV
+# StickPilot
 
 Mirror and control a Fire TV (or any Android device with ADB debugging) from your computer.
 It runs the [scrcpy](https://github.com/Genymobile/scrcpy) server on the device and shows the picture
@@ -25,7 +25,7 @@ npm start           # builds and opens the app
 ```
 
 - `npm run vendor -- /path/to/scrcpy-folder` picks another scrcpy download. Without vendor/, the app
-  falls back to `FIRETV_SCRCPY_DIR` or `~/Documents/tools/scrcpy-macos-x86_64-v4.1`.
+  falls back to `STICKPILOT_SCRCPY_DIR` or `~/Documents/tools/scrcpy-macos-x86_64-v4.1`.
 - `npm run typecheck` runs the TypeScript compiler.
 - `npm run debug` prints the device-side server log.
 
@@ -35,7 +35,7 @@ npm start           # builds and opens the app
 `node scripts/cdp.mjs eval "<js>"` runs JavaScript in the window, `click <x> <y>` and `keys <key>...`
 send real input, `drop <x> <y> <file>` simulates a file drop, and `shot out.png` saves a screenshot.
 `CDP_PAGE=tray.html` targets the menu-bar remote. With `--inspect=9229`, `node scripts/main-eval.mjs "<js>"`
-evaluates code in the main process (`FIRETV_DEBUG=1` also exposes `globalThis.__firetv`). `FIRETV_SCREENSHOT=out.png` saves one a few seconds after launch.
+evaluates code in the main process (`STICKPILOT_DEBUG=1` also exposes `globalThis.__stickpilot`). `STICKPILOT_SCREENSHOT=out.png` saves one a few seconds after launch.
 
 ## Layout
 

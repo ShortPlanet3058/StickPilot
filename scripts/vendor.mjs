@@ -4,7 +4,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync } from 'fs';
 import os from 'os';
 import path from 'path';
 
-const src = process.argv[2] || process.env.FIRETV_SCRCPY_DIR
+const src = process.argv[2] || process.env.STICKPILOT_SCRCPY_DIR
   || path.join(os.homedir(), 'Documents/tools/scrcpy-macos-x86_64-v4.1');
 const adb = process.platform === 'win32' ? 'adb.exe' : 'adb';
 const platformDir = path.join('vendor', `${process.platform}-${process.arch}`);

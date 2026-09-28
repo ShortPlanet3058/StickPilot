@@ -3,7 +3,7 @@
 // StickPilot's helper), falling back to the icon, then to a lettered avatar.
 
 import { icon } from './icons';
-import type { AppArt, AppInfo, FireTvApi } from '../shared/types';
+import type { AppArt, AppInfo, StickPilotApi } from '../shared/types';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -58,7 +58,7 @@ export class AppsPanel {
   art: Record<string, AppArt> = {};
   isOpen = false;
 
-  constructor(private root: HTMLElement, private api: FireTvApi, private ctx: AppsContext) {
+  constructor(private root: HTMLElement, private api: StickPilotApi, private ctx: AppsContext) {
     root.innerHTML = `
       <div class="sheet-backdrop" data-close></div>
       <div class="sheet-panel" role="dialog" aria-label="Apps">

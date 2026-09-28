@@ -14,13 +14,27 @@ import { Typer } from './typing';
 import { adb } from './adb';
 import type { AppInfo, ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
 
+// Before StickPilot the app was called "firetv", which named its data folder:
+// carry the settings and cached app logos over once
+function migrateUserData(): void {
+  const now = app.getPath('userData');
+  const old = path.join(app.getPath('appData'), 'firetv');
+  if (fs.existsSync(path.join(now, 'settings.json')) || !fs.existsSync(old) || old === now) return;
+  fs.mkdirSync(now, { recursive: true });
+  for (const item of ['settings.json', 'app-icons']) {
+    const from = path.join(old, item);
+    if (fs.existsSync(from)) fs.cpSync(from, path.join(now, item), { recursive: true });
+  }
+}
+migrateUserData();
+
 let win: BrowserWindow | null = null;
 const devices = new DeviceManager();
 const session = new Session();
 const typer = new Typer(session);
 const recorder = new Recorder();
-// Development aid: with FIRETV_DEBUG, scripts/main-eval.mjs can reach these objects
-if (process.env.FIRETV_DEBUG) Object.assign(globalThis, { __firetv: { session, recorder, devices } });
+// Development aid: with STICKPILOT_DEBUG, scripts/main-eval.mjs can reach these objects
+if (process.env.STICKPILOT_DEBUG) Object.assign(globalThis, { __stickpilot: { session, recorder, devices } });
 const encoderBySerial = new Map<string, 'hardware' | 'software'>();
 let status: SessionStatus = { state: 'idle' };
 
@@ -79,7 +93,7 @@ session.on('packet', (p) => { send('video:packet', p); recorder.push(p.data, p.k
 session.on('audio-config', (c) => send('audio:config', c));
 session.on('audio-packet', (p) => send('audio:packet', p));
 session.on('audio-ended', () => send('audio:ended', null));
-session.on('log', (line: string) => { if (process.env.FIRETV_DEBUG) process.stdout.write(`[server] ${line}`); });
+session.on('log', (line: string) => { if (process.env.STICKPILOT_DEBUG) process.stdout.write(`[server] ${line}`); });
 session.on('ended', (reason: string) => {
   if (status.state === 'running') setStatus({ state: 'ended', serial: status.serial, reason, cause: 'error' });
 });
@@ -182,12 +196,12 @@ ipcMain.on('window:showMain', () => showMain());
 // ---- Screenshots and recordings
 
 function mediaFile(kind: 'pictures' | 'videos', ext: string): string {
-  const dir = path.join(app.getPath(kind), 'Fire TV');
+  const dir = path.join(app.getPath(kind), 'StickPilot');
   fs.mkdirSync(dir, { recursive: true });
   const d = new Date();
   const p2 = (n: number) => String(n).padStart(2, '0');
   const stamp = `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} at ${p2(d.getHours())}.${p2(d.getMinutes())}.${p2(d.getSeconds())}`;
-  return path.join(dir, `Fire TV ${stamp}.${ext}`);
+  return path.join(dir, `StickPilot ${stamp}.${ext}`);
 }
 
 // screencap runs on the device at its full resolution, whatever the streaming profile
@@ -303,7 +317,7 @@ function createWindow(): void {
     height: 820,
     minWidth: 960,
     minHeight: 560,
-    title: 'Fire TV',
+    title: 'StickPilot',
     backgroundColor: '#0f1012',
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     webPreferences: {
@@ -325,13 +339,13 @@ function createWindow(): void {
   win.on('enter-full-screen', () => send('window:fullscreen', true));
   win.on('leave-full-screen', () => send('window:fullscreen', false));
 
-  // Development aid: FIRETV_SCREENSHOT=out.png saves the window after it settles
-  const shot = process.env.FIRETV_SCREENSHOT;
+  // Development aid: STICKPILOT_SCREENSHOT=out.png saves the window after it settles
+  const shot = process.env.STICKPILOT_SCREENSHOT;
   if (shot) {
     win.webContents.once('did-finish-load', () => setTimeout(async () => {
       const image = await win?.webContents.capturePage();
       if (image) fs.writeFileSync(shot, image.toPNG());
-    }, Number(process.env.FIRETV_SCREENSHOT_DELAY || 4000)));
+    }, Number(process.env.STICKPILOT_SCREENSHOT_DELAY || 4000)));
   }
 }
 

@@ -1,7 +1,7 @@
 // Device panel: live status (storage, memory, temperature, Wi-Fi…) and power actions.
 
 import { icon } from './icons';
-import type { DeviceInfo, DeviceStatusInfo, FireTvApi } from '../shared/types';
+import type { DeviceInfo, DeviceStatusInfo, StickPilotApi } from '../shared/types';
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const gb = (kb: number) => `${(kb / 1024 / 1024).toFixed(kb > 10 * 1024 * 1024 ? 0 : 1)} GB`;
@@ -36,7 +36,7 @@ export class DevicePanel {
   private error = false;
   private confirmReboot = false;
 
-  constructor(private root: HTMLElement, private api: FireTvApi, private ctx: DevicePanelContext) {
+  constructor(private root: HTMLElement, private api: StickPilotApi, private ctx: DevicePanelContext) {
     root.innerHTML = `
       <div class="sheet-backdrop" data-close></div>
       <div class="sheet-panel" role="dialog" aria-label="Device">

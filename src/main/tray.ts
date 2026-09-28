@@ -37,7 +37,7 @@ export class TrayRemote {
     image.addRepresentation({ scaleFactor: 2, buffer: x2 });
     if (process.platform === 'darwin') image.setTemplateImage(true);
     this.tray = new Tray(image);
-    this.tray.setToolTip('Fire TV remote');
+    this.tray.setToolTip('StickPilot');
     this.tray.on('click', () => this.toggle());
     this.tray.on('right-click', () => this.tray?.popUpContextMenu(this.menu()));
     // Linux app indicators only show a menu, so the menu also opens the popover
@@ -62,7 +62,7 @@ export class TrayRemote {
   private menu(): Menu {
     return Menu.buildFromTemplate([
       { label: 'Show mini remote', click: () => this.show() },
-      { label: 'Open Fire TV', click: () => this.hooks.showMain() },
+      { label: 'Open StickPilot', click: () => this.hooks.showMain() },
       { type: 'separator' },
       {
         label: 'Use media keys for the TV',
@@ -105,7 +105,7 @@ export class TrayRemote {
     this.mediaKeysOn = false;
     if (!want) return null;
     if (process.platform === 'darwin' && !systemPreferences.isTrustedAccessibilityClient(false)) {
-      return 'To use the media keys, allow Fire TV in System Settings → Privacy & Security → Accessibility, then turn the option on again.';
+      return 'To use the media keys, allow StickPilot in System Settings → Privacy & Security → Accessibility, then turn the option on again.';
     }
     const ok = MEDIA_KEYS.every(([accel, code]) => globalShortcut.register(accel, () => { this.hooks.tap(code); }));
     this.mediaKeysOn = ok;

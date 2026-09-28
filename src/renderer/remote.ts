@@ -2,7 +2,7 @@
 // adding a layout here; the rendering and input handling are shared.
 
 import { icon } from './icons';
-import type { DeviceKind, FireTvApi } from '../shared/types';
+import type { DeviceKind, StickPilotApi } from '../shared/types';
 
 export const isMac = navigator.userAgent.includes('Mac');
 export const MOD = isMac ? '⌥' : 'Alt+';
@@ -112,7 +112,7 @@ export function renderRemote(kind: DeviceKind): string {
  * meanwhile and ignore repeats, so a second click can't close the panel again.
  */
 let quickBusy = false;
-export function triggerQuickSettings(root: ParentNode, api: FireTvApi): void {
+export function triggerQuickSettings(root: ParentNode, api: StickPilotApi): void {
   if (quickBusy) return;
   quickBusy = true;
   const btns = root.querySelectorAll('[data-action="quickSettings"]');
@@ -124,7 +124,7 @@ export function triggerQuickSettings(root: ParentNode, api: FireTvApi): void {
 }
 
 /** Pointer handling for remote buttons: press on down, release on up, like a real remote. */
-export function bindRemote(root: HTMLElement, api: FireTvApi, canControl: () => boolean): void {
+export function bindRemote(root: HTMLElement, api: StickPilotApi, canControl: () => boolean): void {
   let held: { btn: HTMLElement; code: number } | null = null;
   root.addEventListener('pointerdown', (e) => {
     const btn = (e.target as HTMLElement).closest<HTMLElement>('button[data-key], button[data-action]');

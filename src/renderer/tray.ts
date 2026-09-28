@@ -3,13 +3,13 @@
 import { icon } from './icons';
 import { bindKeyboard } from './keyboard';
 import { bindRemote, flashKey, KEY, triggerQuickSettings } from './remote';
-import type { DeviceInfo, FireTvApi, SessionStatus, Settings } from '../shared/types';
+import type { DeviceInfo, StickPilotApi, SessionStatus, Settings } from '../shared/types';
 
 declare global {
-  interface Window { firetv: FireTvApi }
+  interface Window { stickpilot: StickPilotApi }
 }
 
-const api = window.firetv;
+const api = window.stickpilot;
 const $ = (id: string) => document.getElementById(id)!;
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -38,7 +38,7 @@ $('t-open').innerHTML = icon('fullscreen', 16);
 function render(): void {
   const serial = status.state === 'idle' ? settings?.lastSerial : status.serial;
   const d = devices.find((x) => x.serial === serial);
-  $('t-name').textContent = d?.name ?? 'Fire TV';
+  $('t-name').textContent = d?.name ?? 'StickPilot';
   const pill = $('t-status');
   pill.className = `pill ${running() ? 'live' : status.state === 'connecting' ? '' : d?.state === 'device' ? 'ready' : ''}`;
   pill.textContent = running() ? (status.state === 'running' && status.mode === 'mirror' ? 'Live' : 'Remote')
@@ -50,7 +50,7 @@ function render(): void {
   const canConnect = d?.state === 'device';
   ($('t-connect') as HTMLButtonElement).disabled = !canConnect || status.state === 'connecting';
   $('t-idle-text').innerHTML = !settings?.lastSerial
-    ? 'Connect a device once from the Fire TV window.'
+    ? 'Connect a device once from the StickPilot window.'
     : canConnect ? `Not connected to <b>${esc(d!.name)}</b>.` : `<b>${esc(d?.name ?? serial ?? '')}</b> is not reachable.`;
 }
 

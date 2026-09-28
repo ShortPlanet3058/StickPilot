@@ -1,13 +1,14 @@
 {
-  "name": "firetv",
+  "name": "stickpilot",
+  "productName": "StickPilot",
   "version": "0.1.0",
-  "description": "Mirror and control a Fire TV from your computer (scrcpy-based)",
+  "description": "StickPilot: mirror and control a Fire TV (or other Android device) from your computer",
   "main": "dist/main/main.js",
   "private": true,
   "scripts": {
     "build": "node scripts/build.mjs",
     "start": "node scripts/build.mjs && electron .",
-    "debug": "node scripts/build.mjs && FIRETV_DEBUG=1 electron .",
+    "debug": "node scripts/build.mjs && STICKPILOT_DEBUG=1 electron .",
     "typecheck": "tsc",
     "vendor": "node scripts/vendor.mjs",
     "helper": "node scripts/build-helper.mjs"

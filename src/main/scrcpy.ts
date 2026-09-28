@@ -14,10 +14,10 @@ import { adb, spawnAdb } from './adb';
 import { serverPath, SERVER_VERSION } from './paths';
 import type { AppInfo, Profile } from '../shared/types';
 
-const DEVICE_JAR = '/data/local/tmp/firetv-scrcpy-server.jar';
+const DEVICE_JAR = '/data/local/tmp/stickpilot-server.jar';
 // The server deletes its own file when it starts, so one-shot helpers (app and
 // encoder lists) use a separate copy that a starting session can't remove under them
-const HELPER_JAR = '/data/local/tmp/firetv-scrcpy-helper.jar';
+const HELPER_JAR = '/data/local/tmp/stickpilot-server-helper.jar';
 const FLAG_CONFIG = 1n << 62n;
 const FLAG_KEY = 1n << 61n;
 const PTS_MASK = (1n << 61n) - 1n;

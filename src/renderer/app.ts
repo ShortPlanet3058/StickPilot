@@ -5,13 +5,13 @@ import { icon } from './icons';
 import { bindKeyboard } from './keyboard';
 import { bindRemote, flashKey, isMac, layoutFor, MOD, renderRemote, triggerQuickSettings } from './remote';
 import { Video } from './video';
-import type { DeviceInfo, DeviceKind, FireTvApi, ProfileSet, SessionMode, SessionStatus, Settings, Transport } from '../shared/types';
+import type { DeviceInfo, DeviceKind, StickPilotApi, ProfileSet, SessionMode, SessionStatus, Settings, Transport } from '../shared/types';
 
 declare global {
-  interface Window { firetv: FireTvApi }
+  interface Window { stickpilot: StickPilotApi }
 }
 
-const api = window.firetv;
+const api = window.stickpilot;
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const $$ = <T extends HTMLElement = HTMLElement>(sel: string) => [...document.querySelectorAll<T>(sel)];
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -650,14 +650,14 @@ async function takeScreenshot(): Promise<void> {
   const d = device(state.current);
   if (!d || d.state !== 'device') return;
   const r = await api.screenshot(d.serial);
-  if (r.ok && r.file) toast('Screenshot saved to Pictures › Fire TV.', { kind: 'ok', action: { label: 'Show', run: () => api.showInFolder(r.file!) } });
+  if (r.ok && r.file) toast('Screenshot saved to Pictures › StickPilot.', { kind: 'ok', action: { label: 'Show', run: () => api.showInFolder(r.file!) } });
   else toast(r.message ?? 'The screenshot failed.', { kind: 'error' });
 }
 
 function recordingSaved(r: { file: string; seconds: number } | null): void {
   state.recordingSince = 0;
   render();
-  if (r) toast(`Recording saved (${formatDuration(r.seconds)}) to Movies › Fire TV.`, { kind: 'ok', ms: 8000, action: { label: 'Show', run: () => api.showInFolder(r.file) } });
+  if (r) toast(`Recording saved (${formatDuration(r.seconds)}) to Movies › StickPilot.`, { kind: 'ok', ms: 8000, action: { label: 'Show', run: () => api.showInFolder(r.file) } });
 }
 
 async function toggleRecording(): Promise<void> {

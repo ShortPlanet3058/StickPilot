@@ -3,7 +3,7 @@
 // dropped while more than MAX_AHEAD is queued, so playback settles close to real
 // time instead of carrying that backlog (or any later one) forever.
 
-import type { FireTvApi } from '../shared/types';
+import type { StickPilotApi } from '../shared/types';
 
 const START_DELAY = 0.04; // seconds of buffer ahead of "now" for smooth playback
 const MAX_AHEAD = 0.1;
@@ -15,7 +15,7 @@ export class AudioPlayer {
   private gain: GainNode | null = null;
   onEnded: () => void = () => {};
 
-  constructor(api: FireTvApi) {
+  constructor(api: StickPilotApi) {
     api.onAudioConfig(({ description }) => this.configure(description));
     api.onAudioPacket(({ data, pts }) => {
       if (this.decoder?.state !== 'configured') return;

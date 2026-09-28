@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
-import type { FireTvApi } from '../shared/types';
+import type { StickPilotApi } from '../shared/types';
 
-const api: FireTvApi = {
+const api: StickPilotApi = {
   listDevices: () => ipcRenderer.invoke('devices:list'),
   onDevices: (cb) => { ipcRenderer.on('devices:changed', (_e, list) => cb(list)); },
   connectNetwork: (host) => ipcRenderer.invoke('devices:connectNetwork', host),
@@ -51,4 +51,4 @@ const api: FireTvApi = {
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
 };
 
-contextBridge.exposeInMainWorld('firetv', api);
+contextBridge.exposeInMainWorld('stickpilot', api);

@@ -4,7 +4,7 @@
 // Remote shortcuts use Option (macOS) / Alt, so plain letters can be typed.
 
 import { KEY } from './remote';
-import type { FireTvApi } from '../shared/types';
+import type { StickPilotApi } from '../shared/types';
 
 export interface KeyboardHooks {
   active(): boolean;               // connected and the player is showing
@@ -34,7 +34,7 @@ const MOD_KEYS: Record<string, number> = {
   ArrowUp: KEY.VOLUME_UP, ArrowDown: KEY.VOLUME_DOWN, Digit0: KEY.MUTE,
 };
 
-export function bindKeyboard(api: FireTvApi, hooks: KeyboardHooks): void {
+export function bindKeyboard(api: StickPilotApi, hooks: KeyboardHooks): void {
   const isTextField = (el: EventTarget | null) =>
     el instanceof HTMLElement && el.matches('input:not([type=checkbox]):not([type=radio]), textarea, [contenteditable="true"]');
 

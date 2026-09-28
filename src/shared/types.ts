@@ -123,8 +123,8 @@ export interface ScanResult {
   connected: boolean;
 }
 
-/** API exposed to the renderer as window.firetv */
-export interface FireTvApi {
+/** API exposed to the renderer as window.stickpilot */
+export interface StickPilotApi {
   listDevices(): Promise<DeviceInfo[]>;
   onDevices(cb: (devices: DeviceInfo[]) => void): void;
   connectNetwork(host: string): Promise<NetworkResult>;
@@ -170,9 +170,9 @@ export interface FireTvApi {
   /** Remote-only connection to the given device, or to the last used one */
   connectRemote(serial?: string): Promise<void>;
   showMainWindow(): void;
-  /** Full-resolution screenshot taken on the device, saved to Pictures/Fire TV */
+  /** Full-resolution screenshot taken on the device, saved to Pictures/StickPilot */
   screenshot(serial: string): Promise<{ ok: boolean; file?: string; message?: string }>;
-  /** Records the incoming video to Movies/Fire TV (mirroring only) */
+  /** Records the incoming video to Movies/StickPilot (mirroring only) */
   startRecording(width: number, height: number): Promise<void>;
   stopRecording(): Promise<{ file: string; seconds: number } | null>;
   /** The recording ended on its own (disconnected, profile changed) */
