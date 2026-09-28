@@ -107,6 +107,22 @@ export function renderRemote(kind: DeviceKind): string {
   }).join('');
 }
 
+/**
+ * Quick settings takes about a second (it goes through adb). Show the button as busy
+ * meanwhile and ignore repeats, so a second click can't close the panel again.
+ */
+let quickBusy = false;
+export function triggerQuickSettings(root: ParentNode, api: FireTvApi): void {
+  if (quickBusy) return;
+  quickBusy = true;
+  const btns = root.querySelectorAll('[data-action="quickSettings"]');
+  btns.forEach((b) => b.classList.add('pressed', 'busy'));
+  void api.quickSettings().finally(() => {
+    quickBusy = false;
+    btns.forEach((b) => b.classList.remove('pressed', 'busy'));
+  });
+}
+
 /** Pointer handling for remote buttons: press on down, release on up, like a real remote. */
 export function bindRemote(root: HTMLElement, api: FireTvApi, canControl: () => boolean): void {
   let held: { btn: HTMLElement; code: number } | null = null;
@@ -114,7 +130,7 @@ export function bindRemote(root: HTMLElement, api: FireTvApi, canControl: () => 
     const btn = (e.target as HTMLElement).closest<HTMLElement>('button[data-key], button[data-action]');
     if (!btn || !canControl()) return;
     e.preventDefault(); // keep keyboard focus on the picture
-    if (btn.dataset.action === 'quickSettings') { api.quickSettings(); return; }
+    if (btn.dataset.action === 'quickSettings') { triggerQuickSettings(root, api); return; }
     const code = Number(btn.dataset.key);
     held = { btn, code };
     btn.setPointerCapture(e.pointerId);

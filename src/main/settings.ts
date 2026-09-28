@@ -9,6 +9,9 @@ const DEFAULTS: Settings = {
   remoteVisible: true,
   showStats: false,
   autoConnect: false,
+  transportByDevice: {},
+  homeTab: 'firetv',
+  remoteOnTop: false,
 };
 
 const file = () => path.join(app.getPath('userData'), 'settings.json');

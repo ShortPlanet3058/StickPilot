@@ -7,7 +7,7 @@ import { detectEncoder, Session } from './scrcpy';
 import { flushSettings, getSettings, updateSettings } from './settings';
 import { Typer } from './typing';
 import { adb } from './adb';
-import type { ProfileSet, SessionStatus, Settings } from '../shared/types';
+import type { ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
 
 let win: BrowserWindow | null = null;
 const devices = new DeviceManager();
@@ -63,17 +63,17 @@ session.on('ended', (reason: string) => {
   if (status.state === 'running') setStatus({ state: 'ended', serial: status.serial, reason, cause: 'error' });
 });
 
-async function start(serial: string, profileId: string): Promise<void> {
+async function start(serial: string, profileId: string, mode: SessionMode): Promise<void> {
   await session.stop();
   const dev = devices.get(serial);
   if (!dev || dev.state !== 'device') throw new Error('This device is not ready.');
   const set = await profilesFor(serial);
   const profile = set.profiles.find((p) => p.id === profileId) || set.profiles.find((p) => p.id === set.defaultId)!;
   updateSettings({ lastSerial: serial, profileBySerial: { ...getSettings().profileBySerial, [serial]: profile.id } });
-  setStatus({ state: 'connecting', serial, profileId: profile.id });
+  setStatus({ state: 'connecting', serial, profileId: profile.id, mode });
   try {
-    await session.start(serial, profile);
-    setStatus({ state: 'running', serial, profileId: profile.id });
+    await session.start(serial, mode === 'mirror' ? profile : null);
+    setStatus({ state: 'running', serial, profileId: profile.id, mode });
   } catch (e) {
     setStatus({ state: 'ended', serial, cause: 'error', reason: (e as Error).message });
     throw e;
@@ -102,7 +102,7 @@ ipcMain.handle('devices:forgetNetwork', async (_e, host: string) => {
   updateSettings({ networkHosts: getSettings().networkHosts.filter((x) => x !== h) });
 });
 ipcMain.handle('profiles:for', (_e, serial: string) => profilesFor(serial));
-ipcMain.handle('session:start', (_e, serial: string, profileId: string) => start(serial, profileId));
+ipcMain.handle('session:start', (_e, serial: string, profileId: string, mode: SessionMode) => start(serial, profileId, mode));
 ipcMain.handle('session:stop', async () => {
   const serial = status.state === 'idle' ? '' : status.serial;
   await session.stop();
@@ -118,13 +118,35 @@ ipcMain.on('text', (_e, text: string) => session.text(text));
 ipcMain.on('type', (_e, text: string) => typer.type(text));
 ipcMain.on('backspace', () => typer.backspace());
 ipcMain.on('pasteClipboard', async () => { const t = await clipboard.readText(); if (t) typer.type(t); });
-// scrcpy key injection has no long-press flag, so use adb's; a short delay is fine for a menu
-ipcMain.on('quickSettings', () => {
+// Fire OS opens quick settings only for a key with the long-press flag, which scrcpy's
+// injection can't set, so this goes through adb (about 1 s).
+ipcMain.handle('quickSettings', async () => {
   if (status.state !== 'running') return;
-  void adb(['shell', 'input', 'keyevent', '--longpress', '3'], { serial: status.serial }).catch(() => {});
   typer.invalidate();
+  await adb(['shell', 'input', 'keyevent', '--longpress', '3'], { serial: status.serial }).catch(() => {});
 });
 ipcMain.on('window:toggleFullscreen', () => { if (win) win.setFullScreen(!win.isFullScreen()); });
+
+// Remote-only view: shrink to a remote-sized window, and restore the size afterwards
+const FULL_MIN = { width: 960, height: 560 };
+const COMPACT = { width: 360, height: 760 };
+let savedBounds: Electron.Rectangle | null = null;
+ipcMain.on('window:compact', (_e, on: boolean) => {
+  if (!win) return;
+  if (win.isFullScreen()) win.setFullScreen(false);
+  if (on && !savedBounds) {
+    savedBounds = win.getBounds();
+    win.setMinimumSize(320, 520);
+    const b = win.getBounds();
+    win.setBounds({ x: b.x + b.width - COMPACT.width, y: b.y, ...COMPACT }, true);
+  } else if (!on && savedBounds) {
+    win.setBounds(savedBounds, true);
+    win.setMinimumSize(FULL_MIN.width, FULL_MIN.height);
+    savedBounds = null;
+    win.setAlwaysOnTop(false);
+  }
+});
+ipcMain.on('window:onTop', (_e, on: boolean) => win?.setAlwaysOnTop(on, 'floating'));
 ipcMain.handle('settings:get', () => getSettings());
 ipcMain.handle('settings:set', (_e, patch: Partial<Settings>) => { updateSettings(patch); });
 

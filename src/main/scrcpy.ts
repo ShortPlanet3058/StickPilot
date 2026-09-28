@@ -59,7 +59,8 @@ export class Session extends EventEmitter {
     return !this.stopped;
   }
 
-  async start(serial: string, profile: Profile): Promise<void> {
+  /** profile null = remote only: control channel, no video (no encoding on the device) */
+  async start(serial: string, profile: Profile | null): Promise<void> {
     this.serial = serial;
     this.stopped = false;
     const scid = randomScid();
@@ -67,9 +68,11 @@ export class Session extends EventEmitter {
     await pushServer(serial);
     this.port = Number((await adb(['forward', 'tcp:0', `localabstract:scrcpy_${scid}`], { serial })).trim());
 
+    const videoArgs = profile
+      ? ['video=true', 'video_codec=h264', `max_size=${profile.size}`, `max_fps=${profile.fps}`, `video_bit_rate=${profile.bitrate}`]
+      : ['video=false'];
     const server = spawnAdb(serverArgs(scid, [
-      'tunnel_forward=true', 'audio=false', 'control=true', 'video_codec=h264',
-      `max_size=${profile.size}`, `max_fps=${profile.fps}`, `video_bit_rate=${profile.bitrate}`,
+      'tunnel_forward=true', 'audio=false', 'control=true', ...videoArgs,
       'send_device_meta=false', 'send_stream_meta=false',
     ]), serial);
     this.server = server;
@@ -80,8 +83,14 @@ export class Session extends EventEmitter {
     server.on('exit', (code) => this.end(`The mirroring server stopped (code ${code}). ${lastError(log)}`.trim()));
 
     try {
-      this.video = await this.connectVideo();
-      this.control = await this.connect();
+      // The first socket carries the dummy byte: video when mirroring, else control
+      if (profile) {
+        this.video = await this.connectFirst();
+        this.control = await this.connect();
+      } else {
+        this.control = await this.connectFirst();
+        this.control.resume();
+      }
     } catch (e) {
       const reason = `${(e as Error).message}. ${lastError(log)}`.trim();
       await this.stop();
@@ -89,19 +98,20 @@ export class Session extends EventEmitter {
     }
     this.control.on('data', () => {}); // device messages (clipboard etc.) are not used yet
     this.control.on('error', () => {});
-    this.readVideo(this.video);
+    this.control.on('close', () => this.end('The connection to the device closed.'));
+    if (this.video) this.readVideo(this.video);
     this.streaming = true;
   }
 
   // adb forward accepts connections before the server listens; the dummy byte
   // proves the server is really there.
-  private async connectVideo(): Promise<net.Socket> {
+  private async connectFirst(): Promise<net.Socket> {
     for (let i = 0; i < 100 && !this.stopped; i++) {
       try {
         const sock = await this.connect();
         await new Promise<void>((resolve, reject) => {
           sock.once('data', (d: Buffer) => {
-            sock.pause(); // hold the stream until readVideo attaches its reader
+            sock.pause(); // hold the stream until its reader is attached
             if (d.length > 1) sock.unshift(d.subarray(1));
             resolve();
           });

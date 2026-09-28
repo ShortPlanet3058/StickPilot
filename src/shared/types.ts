@@ -42,10 +42,13 @@ export interface ProfileSet {
   profiles: Profile[];
 }
 
+/** mirror = picture + remote; remote = control only, no video */
+export type SessionMode = 'mirror' | 'remote';
+
 export type SessionStatus =
   | { state: 'idle' }
-  | { state: 'connecting'; serial: string; profileId: string }
-  | { state: 'running'; serial: string; profileId: string }
+  | { state: 'connecting'; serial: string; profileId: string; mode: SessionMode }
+  | { state: 'running'; serial: string; profileId: string; mode: SessionMode }
   | { state: 'ended'; serial: string; reason: string; cause: 'user' | 'unplugged' | 'error' };
 
 export interface Settings {
@@ -56,6 +59,12 @@ export interface Settings {
   showStats: boolean;
   /** Connect to lastSerial on launch when it is available */
   autoConnect: boolean;
+  /** Preferred connection per physical device (hardwareId) when it has several */
+  transportByDevice: Record<string, Transport>;
+  /** Device screen tab */
+  homeTab: DeviceKind;
+  /** Keep the compact remote window above other windows */
+  remoteOnTop: boolean;
 }
 
 export interface VideoPacket {
@@ -78,7 +87,7 @@ export interface FireTvApi {
   connectNetwork(host: string): Promise<NetworkResult>;
   forgetNetwork(host: string): Promise<void>;
   profilesFor(serial: string): Promise<ProfileSet>;
-  start(serial: string, profileId: string): Promise<void>;
+  start(serial: string, profileId: string, mode: SessionMode): Promise<void>;
   stop(): Promise<void>;
   onStatus(cb: (status: SessionStatus) => void): void;
   onConfig(cb: (config: { codec: string }) => void): void;
@@ -90,11 +99,14 @@ export interface FireTvApi {
   type(text: string): void;
   /** Deletes the character before the cursor */
   backspace(): void;
-  /** Long-press Home: Fire TV quick settings */
-  quickSettings(): void;
+  /** Long-press Home: Fire TV quick settings. Resolves once the press is done (about 1 s) */
+  quickSettings(): Promise<void>;
   /** Types the computer's clipboard text on the device */
   pasteClipboard(): void;
   toggleFullscreen(): void;
+  /** Compact window for the remote-only view; restores the previous size when turned off */
+  setCompact(on: boolean): void;
+  setAlwaysOnTop(on: boolean): void;
   onFullscreen(cb: (on: boolean) => void): void;
   getSettings(): Promise<Settings>;
   setSettings(patch: Partial<Settings>): Promise<void>;

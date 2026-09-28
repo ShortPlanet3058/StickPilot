@@ -7,16 +7,17 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <!-- Device screen: pick, add and manage devices -->
+  <!-- Device screen: choose a type of device, then a device and how to open it -->
   <section id="home" class="view" aria-label="Devices">
     <header class="home-head drag">
       <div class="brand"><span id="brand-icon"></span><span>Fire TV</span></div>
-      <label class="toggle no-drag" title="Connect to the last used device as soon as it is available">
+      <label class="toggle no-drag" title="Open the last used device as soon as it is available">
         <input type="checkbox" id="auto-connect">
         <span class="toggle-track" aria-hidden="true"></span>
         <span>Connect automatically</span>
       </label>
     </header>
+    <nav id="home-tabs" class="tabs" role="tablist" aria-label="Device type"></nav>
     <div class="home-body">
       <div id="home-content" class="home-content"></div>
     </div>
@@ -24,20 +25,20 @@
 
   <!-- Player: picture + remote -->
   <section id="player" class="view" aria-label="Player" hidden>
-    <header id="toolbar" class="toolbar drag">
-      <button id="btn-home" class="ghost" title="All devices"></button>
+    <header class="toolbar drag">
+      <button class="ghost nav-home" title="All devices"></button>
       <div class="switcher no-drag">
-        <button id="btn-switch" class="switch-btn" aria-haspopup="menu" aria-expanded="false"></button>
-        <div id="switch-menu" class="menu" role="menu" hidden></div>
+        <button class="switch-btn" aria-haspopup="menu" aria-expanded="false"></button>
       </div>
-      <span id="title-status" class="muted status-text"></span>
+      <span class="muted status-text" data-bind="status"></span>
       <div class="toolbar-spacer"></div>
       <div id="profile-picker" class="segmented no-drag" role="radiogroup" aria-label="Quality profile"></div>
       <div class="toolbar-actions no-drag">
+        <button id="btn-remote-only" class="icon-btn"></button>
         <button id="btn-stats" class="icon-btn" aria-pressed="false"></button>
         <button id="btn-fullscreen" class="icon-btn"></button>
         <button id="btn-remote" class="icon-btn" aria-pressed="true"></button>
-        <button id="btn-connect"></button>
+        <button class="btn-connect"></button>
       </div>
     </header>
 
@@ -51,24 +52,47 @@
           <button id="fs-exit" class="fs-exit"></button>
         </div>
       </div>
-
-      <aside id="remote" aria-label="Remote">
-        <div id="remote-buttons" class="remote-buttons"></div>
-        <form id="type-form" class="type-form">
-          <label for="type-text">Send text to the TV</label>
-          <div class="field-row">
-            <input id="type-text" placeholder="Paste or type, then Enter" autocomplete="off" spellcheck="false">
-            <button type="submit" class="icon-btn" id="type-send" aria-label="Send text"></button>
-          </div>
-          <p class="help">You can also just start typing while the picture is selected.</p>
-        </form>
-        <details class="shortcuts-wrap">
-          <summary>Keyboard shortcuts</summary>
-          <dl id="shortcuts" class="shortcuts"></dl>
-        </details>
-      </aside>
+      <div id="player-remote-slot" class="remote-slot"></div>
     </div>
   </section>
+
+  <!-- Remote only: control without the picture, in a compact window -->
+  <section id="remote-view" class="view" aria-label="Remote" hidden tabindex="-1">
+    <header class="toolbar compact drag">
+      <button class="icon-btn nav-home" title="All devices"></button>
+      <div class="switcher no-drag">
+        <button class="switch-btn" aria-haspopup="menu" aria-expanded="false"></button>
+      </div>
+      <div class="toolbar-spacer"></div>
+      <div class="toolbar-actions no-drag">
+        <button id="btn-pin" class="icon-btn" aria-pressed="false"></button>
+        <button id="btn-show-screen" class="icon-btn"></button>
+        <button class="icon-btn btn-connect-icon"></button>
+      </div>
+    </header>
+    <p class="remote-status muted" data-bind="status"></p>
+    <div id="remote-overlay" class="remote-overlay"></div>
+    <div id="remote-view-slot" class="remote-slot"></div>
+  </section>
+
+  <!-- Shared remote panel; moved into whichever view is showing -->
+  <aside id="remote" aria-label="Remote">
+    <div id="remote-buttons" class="remote-buttons"></div>
+    <form id="type-form" class="type-form">
+      <label for="type-text">Send text to the TV</label>
+      <div class="field-row">
+        <input id="type-text" placeholder="Paste or type, then Enter" autocomplete="off" spellcheck="false">
+        <button type="submit" class="icon-btn" id="type-send" aria-label="Send text"></button>
+      </div>
+      <p class="help">You can also just start typing while this window is active.</p>
+    </form>
+    <details class="shortcuts-wrap">
+      <summary>Keyboard shortcuts</summary>
+      <dl id="shortcuts" class="shortcuts"></dl>
+    </details>
+  </aside>
+
+  <div id="switch-menu" class="menu" role="menu" hidden></div>
 
   <script src="app.js"></script>
 </body>
