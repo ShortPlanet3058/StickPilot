@@ -1,6 +1,9 @@
+import dns from 'dns';
 import { EventEmitter } from 'events';
+import net from 'net';
+import os from 'os';
 import { adb, DeviceTracker, RawDevice } from './adb';
-import type { DeviceInfo, DeviceKind, NetworkResult } from '../shared/types';
+import type { DeviceInfo, DeviceKind, NetworkResult, ScanResult } from '../shared/types';
 
 interface Identity {
   hardwareId: string;
@@ -97,6 +100,65 @@ export class DeviceManager extends EventEmitter {
     }
   }
 
+  /** The device's own IP address on its Wi-Fi (or Ethernet) network */
+  async deviceIp(serial: string): Promise<string | null> {
+    for (const iface of ['wlan0', 'eth0']) {
+      const out = await adb(['shell', `ip -f inet addr show ${iface} 2>/dev/null`], { serial, timeout: 5000 }).catch(() => '');
+      const m = /inet (\d+\.\d+\.\d+\.\d+)/.exec(out);
+      if (m) return m[1];
+    }
+    return null;
+  }
+
+  /**
+   * Adds a Wi-Fi connection to a device that is connected over USB, without typing its IP.
+   * Fire TVs already accept network connections while ADB debugging is on; other Android
+   * devices need `adb tcpip` first, which briefly restarts adb on the device.
+   */
+  async enableWifi(serial: string): Promise<NetworkResult> {
+    const ip = await this.deviceIp(serial);
+    if (!ip) return { ok: false, message: 'The device is not connected to a Wi-Fi or Ethernet network.' };
+    const host = `${ip}:${DEFAULT_ADB_PORT}`;
+    const first = await this.connectNetwork(host);
+    if (first.ok) return first;
+    await adb(['tcpip', String(DEFAULT_ADB_PORT)], { serial }).catch(() => {});
+    await new Promise((r) => setTimeout(r, 2500));
+    return this.connectNetwork(host);
+  }
+
+  /**
+   * Lists hosts on the local /24 networks that answer on the adb port. It only checks
+   * the port: connecting would show an approval prompt on the device, so that's left to the user.
+   */
+  async scanNetwork(): Promise<ScanResult[]> {
+    const own = new Set<string>();
+    const bases = new Set<string>();
+    for (const addrs of Object.values(os.networkInterfaces())) {
+      for (const a of addrs ?? []) {
+        if (a.family !== 'IPv4' || a.internal || a.address.startsWith('169.254.')) continue;
+        own.add(a.address);
+        bases.add(a.address.split('.').slice(0, 3).join('.'));
+      }
+    }
+    const targets = [...bases].slice(0, 2).flatMap((b) => Array.from({ length: 254 }, (_, i) => `${b}.${i + 1}`))
+      .filter((ip) => !own.has(ip));
+    const open: string[] = [];
+    let next = 0;
+    const worker = async () => {
+      while (next < targets.length) {
+        const ip = targets[next++];
+        if (await portOpen(ip, DEFAULT_ADB_PORT, 400)) open.push(ip);
+      }
+    };
+    await Promise.all(Array.from({ length: 64 }, worker));
+    const known = new Set(this.raw.map((d) => d.serial));
+    return Promise.all(open.sort(ipCompare).map(async (ip) => ({
+      host: `${ip}:${DEFAULT_ADB_PORT}`,
+      name: await reverseName(ip),
+      connected: known.has(`${ip}:${DEFAULT_ADB_PORT}`),
+    })));
+  }
+
   async disconnectNetwork(input: string): Promise<void> {
     const host = normalizeHost(input);
     if (host) await adb(['disconnect', host]).catch(() => {});
@@ -121,3 +183,27 @@ function humanizeConnectError(out: string, host: string): string {
   const detail = out.replace(/^adb connect: /, '').replace(/^Command failed:.*$/m, '').trim();
   return detail ? `Could not connect to ${host}: ${detail}` : `Could not connect to ${host}.`;
 }
+
+function portOpen(host: string, port: number, timeout: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock = net.createConnection({ host, port });
+    const done = (ok: boolean) => { sock.destroy(); resolve(ok); };
+    sock.setTimeout(timeout, () => done(false));
+    sock.once('connect', () => done(true));
+    sock.once('error', () => done(false));
+  });
+}
+
+async function reverseName(ip: string): Promise<string> {
+  try {
+    const names = await Promise.race([
+      dns.promises.reverse(ip),
+      new Promise<string[]>((r) => setTimeout(() => r([]), 800)),
+    ]);
+    return (names[0] ?? '').replace(/\.(local|lan|home|box)$/i, '');
+  } catch {
+    return '';
+  }
+}
+
+const ipCompare = (a: string, b: string) => Number(a.split('.')[3]) - Number(b.split('.')[3]);

@@ -6,6 +6,8 @@ const api: FireTvApi = {
   onDevices: (cb) => { ipcRenderer.on('devices:changed', (_e, list) => cb(list)); },
   connectNetwork: (host) => ipcRenderer.invoke('devices:connectNetwork', host),
   forgetNetwork: (host) => ipcRenderer.invoke('devices:forgetNetwork', host),
+  enableWifi: (serial) => ipcRenderer.invoke('devices:enableWifi', serial),
+  scanNetwork: () => ipcRenderer.invoke('devices:scan'),
   profilesFor: (serial) => ipcRenderer.invoke('profiles:for', serial),
   start: (serial, profileId, mode) => ipcRenderer.invoke('session:start', serial, profileId, mode),
   stop: () => ipcRenderer.invoke('session:stop'),

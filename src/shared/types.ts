@@ -80,12 +80,22 @@ export interface NetworkResult {
   serial?: string;
 }
 
+export interface ScanResult {
+  host: string;
+  /** Reverse DNS name if the router provides one */
+  name: string;
+  connected: boolean;
+}
+
 /** API exposed to the renderer as window.firetv */
 export interface FireTvApi {
   listDevices(): Promise<DeviceInfo[]>;
   onDevices(cb: (devices: DeviceInfo[]) => void): void;
   connectNetwork(host: string): Promise<NetworkResult>;
   forgetNetwork(host: string): Promise<void>;
+  /** Adds a Wi-Fi connection to a USB device, reading its IP address itself */
+  enableWifi(serial: string): Promise<NetworkResult>;
+  scanNetwork(): Promise<ScanResult[]>;
   profilesFor(serial: string): Promise<ProfileSet>;
   start(serial: string, profileId: string, mode: SessionMode): Promise<void>;
   stop(): Promise<void>;

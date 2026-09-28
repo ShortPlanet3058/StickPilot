@@ -92,6 +92,17 @@ ipcMain.handle('devices:connectNetwork', async (_e, host: string) => {
   }
   return result;
 });
+function rememberHost(host: string): void {
+  const hosts = getSettings().networkHosts;
+  const h = normalizeHost(host);
+  if (!hosts.includes(h)) updateSettings({ networkHosts: [...hosts, h] });
+}
+ipcMain.handle('devices:enableWifi', async (_e, serial: string) => {
+  const result = await devices.enableWifi(serial);
+  if (result.ok && result.serial) rememberHost(result.serial);
+  return result;
+});
+ipcMain.handle('devices:scan', () => devices.scanNetwork());
 ipcMain.handle('devices:forgetNetwork', async (_e, host: string) => {
   const h = normalizeHost(host);
   if (status.state !== 'idle' && status.state !== 'ended' && status.serial === h) {

@@ -14,6 +14,23 @@ const $$ = <T extends HTMLElement = HTMLElement>(sel: string) => [...document.qu
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 type View = 'home' | 'player' | 'remote';
+
+/** Short notifications at the bottom of the window, optionally with one action */
+export function toast(message: string, opts: { kind?: 'ok' | 'error' | 'info'; action?: { label: string; run: () => void }; ms?: number } = {}): void {
+  const el = document.createElement('div');
+  el.className = `toast ${opts.kind ?? 'info'}`;
+  el.setAttribute('role', 'status');
+  el.innerHTML = `<span>${message.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</span>`;
+  if (opts.action) {
+    const b = document.createElement('button');
+    b.textContent = opts.action.label;
+    b.addEventListener('click', () => { opts.action!.run(); el.remove(); });
+    el.appendChild(b);
+  }
+  document.getElementById('toasts')!.appendChild(el);
+  setTimeout(() => el.classList.add('leaving'), opts.ms ?? 5000);
+  setTimeout(() => el.remove(), (opts.ms ?? 5000) + 300);
+}
 type Tab = 'firetv' | 'tv' | 'phone';
 
 // ---------- State ----------
@@ -148,6 +165,8 @@ function buildAddTile(): void {
       </div>
       <p class="help">Fire TV: Settings → My Fire TV → About → Network shows the IP address. ADB debugging must be on.</p>
       <p class="message" role="status"></p>
+      <button type="button" class="ghost scan-btn">${icon('refresh', 15)}<span>Find devices on this network</span></button>
+      <ul class="scan-results"></ul>
     </form>`;
   const form = addTile.querySelector<HTMLFormElement>('.add-form')!;
   const open = (on: boolean) => {
@@ -157,6 +176,28 @@ function buildAddTile(): void {
     if (on) addTile.querySelector<HTMLInputElement>('#add-host')!.focus();
   };
   addTile.querySelector('.add-open')!.addEventListener('click', () => open(true));
+  const scanBtn = addTile.querySelector<HTMLButtonElement>('.scan-btn')!;
+  const results = addTile.querySelector<HTMLElement>('.scan-results')!;
+  scanBtn.addEventListener('click', async () => {
+    scanBtn.disabled = true;
+    scanBtn.querySelector('span')!.textContent = 'Searching…';
+    results.innerHTML = '';
+    const found = await api.scanNetwork();
+    scanBtn.disabled = false;
+    scanBtn.querySelector('span')!.textContent = 'Search again';
+    results.innerHTML = found.length
+      ? found.map((f) => `<li><span class="scan-name">${esc(f.name || f.host.replace(/:5555$/, ''))}</span>`
+        + `<small>${esc(f.name ? f.host : 'adb port open')}</small>`
+        + (f.connected ? '<span class="pill ready">Added</span>' : `<button type="button" data-scan-host="${esc(f.host)}">Connect</button>`)
+        + '</li>').join('')
+      : '<li class="muted">No devices answered. ADB debugging must be on, on the same network.</li>';
+  });
+  results.addEventListener('click', (e) => {
+    const host = (e.target as HTMLElement).closest<HTMLElement>('[data-scan-host]')?.dataset.scanHost;
+    if (!host) return;
+    addTile.querySelector<HTMLInputElement>('#add-host')!.value = host;
+    form.requestSubmit();
+  });
   addTile.querySelector('.add-close')!.addEventListener('click', () => open(false));
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -199,7 +240,10 @@ function deviceCard(g: DeviceGroup): string {
   const picker = transports.length > 1 && !live
     ? `<div class="mini-seg" role="radiogroup" aria-label="Connection">${(['usb', 'network'] as Transport[]).map((t) =>
       `<button role="radio" data-transport="${t}" data-group="${esc(g.key)}" aria-checked="${d.transport === t}">${icon(t === 'network' ? 'wifi' : 'usb', 13)}${t === 'network' ? 'Wi-Fi' : 'USB'}</button>`).join('')}</div>`
-    : `<p class="dcard-sub">${icon(d.transport === 'network' ? 'wifi' : 'usb', 13)}<span>${esc(via(d))}</span></p>`;
+    : `<p class="dcard-sub">${icon(d.transport === 'network' ? 'wifi' : 'usb', 13)}<span>${esc(via(d))}</span>${
+      d.transport === 'usb' && d.state === 'device' && !g.conns.some((c) => c.transport === 'network') && !live
+        ? `<button class="link" data-wifi="${esc(d.serial)}" title="Connect this device over Wi-Fi too, so it works without the cable">Set up Wi-Fi</button>` : ''
+    }</p>`;
 
   const net = g.conns.find((c) => c.transport === 'network');
   const forget = net
@@ -504,6 +548,15 @@ async function retry(host: string): Promise<void> {
   render();
 }
 
+async function setupWifi(btn: HTMLElement, serial: string): Promise<void> {
+  btn.textContent = 'Setting up…';
+  btn.setAttribute('disabled', '');
+  const result = await api.enableWifi(serial);
+  state.settings = await api.getSettings();
+  toast(result.ok ? 'Wi-Fi connection added. You can now unplug the cable.' : result.message, { kind: result.ok ? 'ok' : 'error' });
+  render();
+}
+
 function maybeAutoConnect(): void {
   const s = state.settings;
   if (state.autoConnectTried || !s?.autoConnect || !s.lastSerial) return;
@@ -573,6 +626,7 @@ function wire(): void {
     if (t.dataset.open) openLive(t.dataset.open);
     if (t.dataset.forget) void forget(t.dataset.forget);
     if (t.dataset.retry) void retry(t.dataset.retry);
+    if (t.dataset.wifi) void setupWifi(t, t.dataset.wifi);
     if (t.dataset.transport && t.dataset.group && state.settings) {
       void saveSetting({ transportByDevice: { ...state.settings.transportByDevice, [t.dataset.group]: t.dataset.transport as Transport } });
     }
