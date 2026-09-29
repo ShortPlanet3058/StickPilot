@@ -71,7 +71,7 @@
       "target": "dmg",
       "icon": "assets/StickPilot.icns",
       "category": "public.app-category.utilities",
-      "identity": "-",
+      "identity": null,
       "extendInfo": {
         "NSLocalNetworkUsageDescription": "StickPilot connects to your TV over Wi-Fi and looks for TVs on your local network."
       },
@@ -86,6 +86,7 @@
     "dmg": {
       "title": "StickPilot ${version}",
       "artifactName": "StickPilot-${version}-mac-${arch}.${ext}"
-    }
+    },
+    "afterSign": "scripts/sign-mac.cjs"
   }
 }
