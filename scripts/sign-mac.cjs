@@ -10,13 +10,26 @@ const path = require('path');
 
 const IDENTITY = process.env.STICKPILOT_SIGN_IDENTITY || 'StickPilot Local Signing';
 
-function hasIdentity(name) {
+/**
+ * SHA-1 of the signing identity called `name`, or null. Several certificates can share a
+ * name (codesign then refuses it as ambiguous): the one valid the longest is used, so
+ * builds keep one identity.
+ */
+function findIdentity(name) {
   try {
     // Without -v: a self-signed certificate isn't "trusted", but codesign can still use it
     const out = execFileSync('security', ['find-identity', '-p', 'codesigning'], { encoding: 'utf8' });
-    return out.includes(`"${name}"`);
+    const hashes = [...out.matchAll(/\b([0-9A-F]{40}) "([^"]+)"/g)].filter((m) => m[2] === name).map((m) => m[1]);
+    if (hashes.length <= 1) return hashes[0] ?? null;
+    const expiry = (hash) => {
+      const pem = execFileSync('security', ['find-certificate', '-a', '-c', name, '-Z', '-p'], { encoding: 'utf8' })
+        .split(/(?=SHA-256 hash:)/).find((block) => block.includes(hash));
+      const end = pem && execFileSync('openssl', ['x509', '-noout', '-enddate'], { input: pem.slice(pem.indexOf('-----BEGIN')), encoding: 'utf8' });
+      return end ? Date.parse(end.replace('notAfter=', '')) : 0;
+    };
+    return hashes.sort((a, b) => expiry(b) - expiry(a))[0];
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -43,7 +56,7 @@ function walk(dir) {
 exports.default = async function afterSign(context) {
   if (context.electronPlatformName !== 'darwin') return;
   const app = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
-  const identity = hasIdentity(IDENTITY) ? IDENTITY : '-';
+  const identity = findIdentity(IDENTITY) ?? '-';
   const sign = (target, deep) => execFileSync('codesign',
     ['--force', ...(deep ? ['--deep'] : []), '--sign', identity, '--timestamp=none', target], { stdio: 'inherit' });
 
@@ -53,5 +66,5 @@ exports.default = async function afterSign(context) {
   for (const f of walk(resources)) if (machO(f)) sign(f, false);
   sign(app, true);
   execFileSync('codesign', ['--verify', '--deep', '--strict', app], { stdio: 'inherit' });
-  console.log(`  • signed with ${identity === '-' ? 'an ad-hoc signature (no "' + IDENTITY + '" certificate found)' : `"${identity}"`}`);
+  console.log(`  • signed with ${identity === '-' ? 'an ad-hoc signature (no "' + IDENTITY + '" certificate found)' : `"${IDENTITY}" (${identity})`}`);
 };
