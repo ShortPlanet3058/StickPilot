@@ -85,19 +85,41 @@ export class DeviceManager extends EventEmitter {
     }
   }
 
-  async connectNetwork(input: string): Promise<NetworkResult> {
+  async connectNetwork(input: string, retried = false): Promise<NetworkResult> {
     const host = normalizeHost(input);
     if (!host) return { ok: false, message: 'Enter an IP address, e.g. 192.168.1.40' };
+    let out: string;
     try {
       // adb connect waits for a TCP connection; unreachable hosts time out
-      const out = (await adb(['connect', host], { timeout: 12000 })).trim();
-      if (/connected to|already connected/i.test(out)) {
-        return { ok: true, message: `Connected to ${host}. If the TV asks, allow USB debugging.`, serial: host };
-      }
-      return { ok: false, message: humanizeConnectError(out, host) };
+      out = (await adb(['connect', host], { timeout: 12000 })).trim();
     } catch (e) {
-      return { ok: false, message: humanizeConnectError((e as Error).message, host) };
+      out = (e as Error).message;
     }
+    if (/connected to|already connected/i.test(out) && !/failed|cannot|unable/i.test(out)) {
+      return { ok: true, message: `Connected to ${host}. If the TV asks, allow USB debugging.`, serial: host };
+    }
+    // macOS applies Local Network permission to the process that started the adb server,
+    // and adb reuses a running server. One started by another app, or by StickPilot before
+    // access was granted, keeps failing with "No route to host" while StickPilot itself can
+    // reach the device: restart the server so it runs under StickPilot's permission.
+    if (!retried && /No route to host|EHOSTUNREACH/i.test(out)) {
+      const [ip, port] = host.split(':');
+      if (await portOpen(ip, Number(port), 1500)) {
+        await this.restartServer();
+        return this.connectNetwork(host, true);
+      }
+    }
+    return { ok: false, message: humanizeConnectError(out, host) };
+  }
+
+  /** Restarts the adb server from this app (the device tracker reconnects on its own) */
+  private restarting: Promise<void> | null = null;
+  restartServer(): Promise<void> {
+    this.restarting ??= (async () => {
+      await adb(['kill-server']).catch(() => {});
+      await adb(['start-server']).catch(() => {});
+    })().finally(() => { this.restarting = null; });
+    return this.restarting;
   }
 
   /** Live status for the device panel, in one shell round trip */

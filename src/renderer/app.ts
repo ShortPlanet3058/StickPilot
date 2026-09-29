@@ -261,13 +261,18 @@ function deviceCard(g: DeviceGroup): string {
 }
 
 function missingCard(host: string): string {
-  return `<article class="dcard dim">
-      <div class="dcard-top"><span class="dcard-icon">${icon('wifi', 22)}</span>
-        <span class="dcard-top-end"><span class="pill">Not reachable</span>
+  // Discover may have just found it: then it is on the network, only not connected yet
+  const found = state.discovered.find((f) => f.host === host);
+  const reachable = !!found?.adb;
+  return `<article class="dcard${reachable ? '' : ' dim'}">
+      <div class="dcard-top"><span class="dcard-icon">${icon(found && found.kind !== 'unknown' ? 'tv' : 'wifi', 22)}</span>
+        <span class="dcard-top-end"><span class="pill ${reachable ? 'ready' : ''}">${reachable ? 'Found' : 'Not reachable'}</span>
         <button class="icon-btn more" data-more-host="${esc(host)}" title="More" aria-haspopup="menu">${icon('more', 18)}</button></span></div>
-      <h3>${esc(host)}</h3>
-      <p class="dcard-detail">Saved Wi-Fi device</p>
-      <div class="dcard-foot"><button data-retry="${esc(host)}">Try again</button></div>
+      <h3>${esc(found?.name || host)}</h3>
+      <p class="dcard-detail">${esc(found?.name ? `Saved Wi-Fi device · ${found.ip}` : 'Saved Wi-Fi device')}</p>
+      <div class="dcard-foot">${reachable
+        ? `<button class="primary" data-join="${esc(host)}">Connect</button>`
+        : `<button data-retry="${esc(host)}">Try again</button>`}</div>
     </article>`;
 }
 
