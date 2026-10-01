@@ -7,7 +7,7 @@
 **Your Fire TV, on your computer.**<br>
 Watch the TV's picture in a window, drive it with a full remote, type with your keyboard and open apps in one click, over Wi-Fi or USB.
 
-[![Latest release](https://img.shields.io/github/v/release/ShortPlanet3058/StickPilot?label=download&color=2563eb)](https://github.com/ShortPlanet3058/StickPilot/releases/latest)
+[![Latest release](https://img.shields.io/github/v/release/ShortPlanet3058/StickPilot?label=download&color=2563eb&logo=github&cacheSeconds=3600)](https://github.com/ShortPlanet3058/StickPilot/releases/latest)
 ![macOS](https://img.shields.io/badge/macOS-13%2B-111111?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)
 ![Built on scrcpy](https://img.shields.io/badge/built%20on-scrcpy%204.1-3ddc84?logo=android&logoColor=white)
