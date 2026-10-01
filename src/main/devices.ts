@@ -1,3 +1,4 @@
+import dgram from 'dgram';
 import dns from 'dns';
 import { EventEmitter } from 'events';
 import net from 'net';
@@ -198,16 +199,8 @@ export class DeviceManager extends EventEmitter {
    * the user's choice. Only local traffic.
    */
   async scanNetwork(): Promise<ScanResult[]> {
-    const own = new Set<string>();
-    const bases = new Set<string>();
-    for (const addrs of Object.values(os.networkInterfaces())) {
-      for (const a of addrs ?? []) {
-        if (a.family !== 'IPv4' || a.internal || a.address.startsWith('169.254.')) continue;
-        own.add(a.address);
-        bases.add(a.address.split('.').slice(0, 3).join('.'));
-      }
-    }
-    const ips = [...bases].slice(0, 2).flatMap((b) => Array.from({ length: 254 }, (_, i) => `${b}.${i + 1}`))
+    const { own, bases } = await localNetworks();
+    const ips = bases.slice(0, 2).flatMap((b) => Array.from({ length: 254 }, (_, i) => `${b}.${i + 1}`))
       .filter((ip) => !own.has(ip));
     const PORTS = [DEFAULT_ADB_PORT, 60000, 8008];
     const jobs = ips.flatMap((ip) => PORTS.map((port) => ({ ip, port })));
@@ -216,13 +209,13 @@ export class DeviceManager extends EventEmitter {
     const worker = async () => {
       while (next < jobs.length) {
         const { ip, port } = jobs[next++];
-        if (await portOpen(ip, port, 400)) {
+        if (await portOpen(ip, port, 700)) {
           if (!open.has(ip)) open.set(ip, new Set());
           open.get(ip)!.add(port);
         }
       }
     };
-    await Promise.all(Array.from({ length: 96 }, worker));
+    await Promise.all(Array.from({ length: 128 }, worker));
 
     const known = new Set(this.raw.map((d) => d.serial));
     const results = await Promise.all([...open].map(async ([ip, ports]): Promise<ScanResult | null> => {
@@ -271,6 +264,42 @@ function humanizeConnectError(out: string, host: string): string {
   }
   const detail = out.replace(/^adb connect: /, '').replace(/^Command failed:.*$/m, '').trim();
   return detail ? `Could not connect to ${host}: ${detail}` : `Could not connect to ${host}.`;
+}
+
+/** The address this computer uses to reach the internet (no packet is sent), or null offline */
+function defaultRouteAddress(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const sock = dgram.createSocket('udp4');
+    const done = (ip: string | null) => { sock.close(); resolve(ip); };
+    sock.once('error', () => done(null));
+    sock.connect(53, '8.8.8.8', () => { try { done(sock.address().address); } catch { done(null); } });
+  });
+}
+
+// Adapters that are never the home network: Hyper-V / WSL, VirtualBox, VMware, Docker, VPNs
+const VIRTUAL = /vEthernet|Hyper-V|WSL|VirtualBox|VMware|vboxnet|vmnet|docker|br-|virbr|Tailscale|ZeroTier|utun|tun\d|tap\d|Loopback|Bluetooth/i;
+
+/**
+ * This computer's addresses and the /24 networks to scan, the one holding the default
+ * route first, then other private networks of physical-looking adapters.
+ */
+async function localNetworks(): Promise<{ own: Set<string>; bases: string[] }> {
+  const own = new Set<string>();
+  const ranked: { base: string; score: number }[] = [];
+  const primary = await defaultRouteAddress();
+  const isPrivate = (ip: string) => /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip);
+  for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
+    for (const a of addrs ?? []) {
+      if (a.family !== 'IPv4' || a.internal || a.address.startsWith('169.254.')) continue;
+      own.add(a.address);
+      const score = (a.address === primary ? 100 : 0) + (VIRTUAL.test(name) ? -50 : 0) + (isPrivate(a.address) ? 10 : 0)
+        + (/wi-?fi|wlan|wireless|^en\d|^eth|ethernet/i.test(name) ? 5 : 0);
+      ranked.push({ base: a.address.split('.').slice(0, 3).join('.'), score });
+    }
+  }
+  ranked.sort((a, b) => b.score - a.score);
+  const bases = [...new Set(ranked.filter((r) => r.score > -40).map((r) => r.base))];
+  return { own, bases };
 }
 
 function portOpen(host: string, port: number, timeout: number): Promise<boolean> {
