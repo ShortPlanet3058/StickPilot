@@ -100,7 +100,7 @@ Storage, memory, CPU temperature and Wi-Fi signal at a glance, plus Sleep, Wake 
 
 ## Getting started
 
-<img src="docs/screenshots/devices.png" alt="Device list with a Fire TV ready to connect" width="560" align="right">
+<img src="docs/screenshots/devices.png" alt="Device list with a Fire TV ready to connect" width="400" align="right">
 
 1. **Turn on ADB debugging on the TV.** Settings → My Fire TV → Developer options → ADB debugging.
    If Developer options is missing: Settings → My Fire TV → About, then select the device name 7 times.
