@@ -49,13 +49,16 @@ export function bindKeyboard(api: StickPilotApi, hooks: KeyboardHooks): void {
     down.clear();
   };
 
+  // AltGr (Windows, Linux) types characters such as @ # { } on many layouts (French AZERTY:
+  // AltGr+0 is @). Windows reports it as Ctrl+Alt, so it is neither a shortcut nor Ctrl.
+  const altGr = (e: KeyboardEvent) => e.getModifierState('AltGraph');
   const shouldHandle = (e: KeyboardEvent) =>
-    hooks.active() && !hooks.menuOpen() && !isTextField(e.target) && !e.metaKey && !e.ctrlKey;
+    hooks.active() && !hooks.menuOpen() && !isTextField(e.target) && !e.metaKey && (!e.ctrlKey || altGr(e));
 
   document.addEventListener('keydown', (e) => {
     if (!shouldHandle(e)) return;
 
-    if (e.altKey) {
+    if (e.altKey && !altGr(e)) {
       const special: Record<string, () => void> = {
         KeyQ: hooks.quickSettings,
         KeyA: hooks.toggleApps,

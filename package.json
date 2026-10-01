@@ -14,7 +14,8 @@
     "vendor": "node scripts/vendor.mjs",
     "helper": "node scripts/build-helper.mjs",
     "dist:mac": "node scripts/build.mjs && electron-builder --mac dmg --x64",
-    "keys-helper": "bash scripts/build-keys.sh"
+    "keys-helper": "bash scripts/build-keys.sh",
+    "dist:win": "node scripts/build.mjs && electron-builder --win nsis --x64"
   },
   "license": "UNLICENSED",
   "devDependencies": {
@@ -39,7 +40,11 @@
     "files": [
       "dist/**/*",
       "package.json",
-      "!**/*.map"
+      "!**/*.map",
+      "!node_modules/uiohook-napi/build/**",
+      "!node_modules/uiohook-napi/src/**",
+      "!node_modules/uiohook-napi/libuiohook/**",
+      "!node_modules/@types/**"
     ],
     "extraResources": [
       {
@@ -51,10 +56,6 @@
         "to": "vendor/scrcpy-LICENSE"
       },
       {
-        "from": "vendor/${platform}-${arch}",
-        "to": "vendor/${platform}-${arch}"
-      },
-      {
         "from": "helper/dist/stickpilot-helper.jar",
         "to": "helper/stickpilot-helper.jar"
       },
@@ -63,7 +64,8 @@
         "to": "assets",
         "filter": [
           "icon.png",
-          "icon-512.png"
+          "icon-512.png",
+          "icon.ico"
         ]
       }
     ],
@@ -78,6 +80,10 @@
       "hardenedRuntime": false,
       "extraResources": [
         {
+          "from": "vendor/darwin-x64",
+          "to": "vendor/darwin-x64"
+        },
+        {
           "from": "helper/dist/stickpilot-keys",
           "to": "helper/stickpilot-keys"
         }
@@ -86,6 +92,30 @@
     "dmg": {
       "title": "StickPilot ${version}",
       "artifactName": "StickPilot-${version}-mac-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "extraResources": [
+        {
+          "from": "vendor/win32-x64",
+          "to": "vendor/win32-x64"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "StickPilot",
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "StickPilot-${version}-win-${arch}-setup.${ext}"
     },
     "afterSign": "scripts/sign-mac.cjs"
   }

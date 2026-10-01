@@ -39,7 +39,7 @@ export async function appArt(serial: string, pkgs: string[], refresh = false): P
     const out = await new Promise<string>((resolve, reject) => {
       execFile(adbPath(), ['-s', serial, 'shell', `CLASSPATH=${DEVICE_HELPER}`, 'app_process', '/',
         'app.stickpilot.helper.IconDumper', String(ICON_SIZE), ...missing],
-      { maxBuffer: 64 * 1024 * 1024, timeout: 60000 }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
+      { maxBuffer: 64 * 1024 * 1024, timeout: 60000, windowsHide: true }, (err, stdout) => (err ? reject(err) : resolve(stdout)));
     });
     const got = new Set<string>();
     for (const line of out.split('\n')) {

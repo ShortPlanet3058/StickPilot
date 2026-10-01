@@ -40,6 +40,15 @@ Accessibility and Local Network permissions after updates. Without that certific
 falls back to an ad-hoc signature, whose identity changes every build. The app isn't notarized:
 a copy downloaded elsewhere needs System Settings → Privacy & Security → Open Anyway the first time.
 
+`npm run dist:win` builds `release/StickPilot-<version>-win-x64-setup.exe` on a Mac too (no Wine
+needed). It needs the Windows adb first: `npm run vendor -- ~/Documents/tools/scrcpy-win64-v4.1`
+(the official scrcpy Windows release) copies adb.exe and its two DLLs into vendor/win32-x64. The
+installer is one click, per user (no administrator rights), into `%LOCALAPPDATA%\Programs\StickPilot`,
+with Start menu and desktop shortcuts. It isn't signed, so SmartScreen asks once: More info → Run
+anyway. On Windows the double-tap Right Shift shortcut uses uiohook-napi's prebuilt binary, the
+tray icon sits in the notification area, and a USB connection needs the device's ADB driver
+(Wi-Fi needs nothing).
+
 ### Driving the app from scripts
 
 `npx electron . --remote-debugging-port=9223` starts the app with the DevTools protocol on.

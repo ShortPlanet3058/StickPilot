@@ -2,7 +2,7 @@ import dns from 'dns';
 import { EventEmitter } from 'events';
 import net from 'net';
 import os from 'os';
-import { adb, DeviceTracker, RawDevice } from './adb';
+import { adb, DeviceTracker, RawDevice, startServer } from './adb';
 import type { DeviceInfo, DeviceKind, DeviceStatusInfo, NetworkResult, ScanResult } from '../shared/types';
 
 interface Identity {
@@ -117,7 +117,7 @@ export class DeviceManager extends EventEmitter {
   restartServer(): Promise<void> {
     this.restarting ??= (async () => {
       await adb(['kill-server']).catch(() => {});
-      await adb(['start-server']).catch(() => {});
+      await startServer();
     })().finally(() => { this.restarting = null; });
     return this.restarting;
   }

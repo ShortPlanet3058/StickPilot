@@ -7,6 +7,8 @@ import { trayIconPngs } from './trayIcon';
 const POPUP = { width: 288, height: 488 };
 
 export interface TrayHooks {
+  /** Icon file for Windows / Linux (full color); null on macOS, which gets a drawn template glyph */
+  icon: string | null;
   preload: string;
   page: string;
   showMain(): void;
@@ -31,15 +33,23 @@ export class TrayRemote {
   private tray: Tray | null = null;
   popup: BrowserWindow | null = null;
   private mediaKeysOn = false;
+  private hiddenAt = 0;
 
   constructor(private hooks: TrayHooks) {}
 
   create(): void {
-    const { x1, x2 } = trayIconPngs();
-    const image = nativeImage.createEmpty();
-    image.addRepresentation({ scaleFactor: 1, buffer: x1 });
-    image.addRepresentation({ scaleFactor: 2, buffer: x2 });
-    if (process.platform === 'darwin') image.setTemplateImage(true);
+    let image: Electron.NativeImage;
+    if (this.hooks.icon) {
+      // Windows picks the right size from the .ico; a dark/light-only glyph would vanish on one taskbar color
+      image = nativeImage.createFromPath(this.hooks.icon);
+      if (!this.hooks.icon.endsWith('.ico')) image = image.resize({ width: 22, height: 22, quality: 'best' });
+    } else {
+      const { x1, x2 } = trayIconPngs();
+      image = nativeImage.createEmpty();
+      image.addRepresentation({ scaleFactor: 1, buffer: x1 });
+      image.addRepresentation({ scaleFactor: 2, buffer: x2 });
+      image.setTemplateImage(true);
+    }
     this.tray = new Tray(image);
     this.tray.setToolTip('StickPilot');
     this.tray.on('click', () => this.toggle());
@@ -60,7 +70,7 @@ export class TrayRemote {
       webPreferences: { preload: this.hooks.preload, contextIsolation: true, sandbox: true },
     });
     this.popup.loadFile(this.hooks.page);
-    this.popup.on('blur', () => this.popup?.hide());
+    this.popup.on('blur', () => { this.hiddenAt = Date.now(); this.popup?.hide(); });
   }
 
   private menu(): Menu {
@@ -81,7 +91,7 @@ export class TrayRemote {
         click: (item) => this.hooks.setDoubleShift(item.checked),
       },
       {
-        label: 'Keep running in the menu bar when closed',
+        label: process.platform === 'darwin' ? 'Keep running in the menu bar when closed' : 'Keep running in the notification area when closed',
         type: 'checkbox',
         checked: this.hooks.stayInMenuBar(),
         click: (item) => this.hooks.setStayInMenuBar(item.checked),
@@ -93,18 +103,28 @@ export class TrayRemote {
 
   toggle(): void {
     if (this.popup?.isVisible()) this.popup.hide();
-    else this.show();
+    // Clicking the icon while the remote is open first blurs it (which hides it): that click means close
+    else if (Date.now() - this.hiddenAt > 300) this.show();
+  }
+
+  /** A one-off notification from the tray icon (Windows balloon) */
+  hint(title: string, content: string): void {
+    if (process.platform === 'win32') this.tray?.displayBalloon({ title, content, iconType: 'info' });
   }
 
   show(): void {
     if (!this.tray || !this.popup) return;
-    const b = this.tray.getBounds();
+    let b = this.tray.getBounds();
+    // Some Linux trays don't report where the icon is: open by the pointer instead
+    if (!b.width) { const p = screen.getCursorScreenPoint(); b = { x: p.x, y: p.y, width: 1, height: 1 }; }
     const area = screen.getDisplayMatching(b).workArea;
-    // Below the icon on macOS (menu bar on top); above it for bottom taskbars
+    // Below the icon on macOS (menu bar on top); above it for bottom taskbars. Kept on screen
+    // for taskbars on the left or right too.
     const below = b.y < area.y + area.height / 2;
-    const x = Math.round(Math.min(Math.max(b.x + b.width / 2 - POPUP.width / 2, area.x + 8), area.x + area.width - POPUP.width - 8));
-    const y = below ? b.y + b.height + 4 : b.y - POPUP.height - 4;
-    this.popup.setPosition(x, Math.round(y));
+    const clamp = (v: number, lo: number, hi: number) => Math.round(Math.min(Math.max(v, lo), hi));
+    const x = clamp(b.x + b.width / 2 - POPUP.width / 2, area.x + 8, area.x + area.width - POPUP.width - 8);
+    const y = clamp(below ? b.y + b.height + 4 : b.y - POPUP.height - 4, area.y, area.y + area.height - POPUP.height);
+    this.popup.setPosition(x, y);
     this.popup.show();
     this.popup.focus();
   }

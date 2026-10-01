@@ -11,7 +11,7 @@ export interface AdbOptions {
 export function adb(args: string[], { serial, timeout = 15000 }: AdbOptions = {}): Promise<string> {
   const full = serial ? ['-s', serial, ...args] : args;
   return new Promise((resolve, reject) => {
-    execFile(adbPath(), full, { timeout }, (err, stdout, stderr) => {
+    execFile(adbPath(), full, { timeout, windowsHide: true }, (err, stdout, stderr) => {
       if (err && err.killed) reject(new Error(`adb ${args[0]} timed out`));
       else if (err) reject(new Error(`adb ${args[0]}: ${(stderr || stdout || err.message).trim()}`));
       else resolve(stdout);
@@ -19,8 +19,23 @@ export function adb(args: string[], { serial, timeout = 15000 }: AdbOptions = {}
   });
 }
 
+// windowsHide: adb is a console program; without it every call flashes a console window on Windows
 export function spawnAdb(args: string[], serial?: string): ChildProcess {
-  return spawn(adbPath(), serial ? ['-s', serial, ...args] : args);
+  return spawn(adbPath(), serial ? ['-s', serial, ...args] : args, { windowsHide: true });
+}
+
+/**
+ * Starts the adb server if it isn't running. No pipes: the server keeps running after
+ * this call exits, and must not hold on to (and so keep open) any of our handles.
+ */
+export function startServer(timeout = 15000): Promise<void> {
+  return new Promise((resolve) => {
+    const proc = spawn(adbPath(), ['start-server'], { stdio: 'ignore', windowsHide: true });
+    const timer = setTimeout(() => { proc.kill(); resolve(); }, timeout);
+    const done = () => { clearTimeout(timer); resolve(); };
+    proc.once('exit', done);
+    proc.once('error', done);
+  });
 }
 
 export interface RawDevice {
@@ -58,7 +73,7 @@ export class DeviceTracker extends EventEmitter {
 
   async start(): Promise<void> {
     this.stopped = false;
-    await adb(['start-server']).catch(() => {});
+    await startServer();
     this.spawn();
   }
 

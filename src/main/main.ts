@@ -1,4 +1,4 @@
-import { app, BrowserWindow, clipboard, ipcMain, shell, systemPreferences } from 'electron';
+import { app, BrowserWindow, clipboard, ipcMain, Menu, shell, systemPreferences } from 'electron';
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -233,7 +233,7 @@ function mediaFile(kind: 'pictures' | 'videos', ext: string): string {
 
 // screencap runs on the device at its full resolution, whatever the streaming profile
 ipcMain.handle('capture:screenshot', (_e, serial: string) => new Promise((resolve) => {
-  execFile(adbPath(), ['-s', serial, 'exec-out', 'screencap', '-p'], { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 15000 },
+  execFile(adbPath(), ['-s', serial, 'exec-out', 'screencap', '-p'], { encoding: 'buffer', maxBuffer: 64 * 1024 * 1024, timeout: 15000, windowsHide: true },
     (err, stdout) => {
       if (err || stdout.length < 100 || stdout.readUInt32BE(0) !== 0x89504e47) {
         resolve({ ok: false, message: 'The device did not return a screenshot.' });
@@ -346,7 +346,7 @@ const assetPath = (name: string) => (app.isPackaged
 function createWindow(): void {
   win = new BrowserWindow({
     // Windows and Linux show this in the title bar and taskbar; macOS uses the app bundle's icon
-    icon: process.platform === 'darwin' ? undefined : assetPath('icon-512.png'),
+    icon: process.platform === 'darwin' ? undefined : assetPath(process.platform === 'win32' ? 'icon.ico' : 'icon-512.png'),
     width: 1400,
     height: 820,
     minWidth: 960,
@@ -371,6 +371,11 @@ function createWindow(): void {
     win?.hide();
     // Menu bar only from now on: no Dock icon, not in ⌘Tab, until the window is opened again
     if (process.platform === 'darwin') app.dock?.hide();
+    // Windows: nothing on screen says the app is still running, so say it once
+    else if (!getSettings().trayHintShown) {
+      updateSettings({ trayHintShown: true });
+      tray.hint('StickPilot is still running', 'Click its icon in the notification area to open the remote; right-click for more, or to quit.');
+    }
     if (status.state === 'running' && status.mode === 'mirror') void start(status.serial, status.profileId, 'remote').catch(() => {});
   });
   win.on('enter-full-screen', () => send('window:fullscreen', true));
@@ -391,6 +396,7 @@ function createWindow(): void {
 let quitting = false;
 
 const tray = new TrayRemote({
+  icon: process.platform === 'darwin' ? null : assetPath(process.platform === 'win32' ? 'icon.ico' : 'icon-512.png'),
   preload: path.join(__dirname, '..', 'preload', 'preload.js'),
   page: path.join(__dirname, '..', 'renderer', 'tray.html'),
   showMain: () => showMain(),
@@ -442,6 +448,13 @@ function showMain(): void {
   win!.focus();
 }
 
+// One StickPilot at a time: opening it again (Start menu, desktop shortcut) shows the running one
+// (packaged only, so a development copy can run next to the installed app)
+if (app.isPackaged && !app.requestSingleInstanceLock()) app.exit(0);
+app.on('second-instance', () => showMain());
+// Windows groups the taskbar button and notifications by this; must match the installer's appId
+if (process.platform === 'win32') app.setAppUserModelId('app.stickpilot');
+
 app.on('before-quit', () => { quitting = true; });
 app.on('activate', () => showMain());
 
@@ -449,6 +462,8 @@ app.whenReady().then(async () => {
   // A packaged app gets its Dock icon from StickPilot.icns; during development
   // Electron's own icon would show instead
   if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(assetPath('icon.png'));
+  // Windows and Linux would show Electron's File / Edit / View menu bar in the window; nothing in it is needed
+  if (process.platform !== 'darwin') Menu.setApplicationMenu(null);
   createWindow();
   tray.create();
   // The notice would arrive before the window can show it, so wait for it to load

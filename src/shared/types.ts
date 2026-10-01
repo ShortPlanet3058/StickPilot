@@ -77,6 +77,8 @@ export interface Settings {
   doubleShift: boolean;
   /** Closing the window keeps StickPilot in the menu bar (and out of the Dock) instead of quitting */
   stayInMenuBar: boolean;
+  /** Windows: the "still running in the notification area" balloon was shown once */
+  trayHintShown: boolean;
 }
 
 export interface VideoPacket {

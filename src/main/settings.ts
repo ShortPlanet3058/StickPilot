@@ -18,6 +18,7 @@ const DEFAULTS: Settings = {
   mediaKeys: false,
   doubleShift: true,
   stayInMenuBar: true,
+  trayHintShown: false,
 };
 
 const file = () => path.join(app.getPath('userData'), 'settings.json');
