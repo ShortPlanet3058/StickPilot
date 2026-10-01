@@ -115,7 +115,8 @@
       "perMachine": false,
       "shortcutName": "StickPilot",
       "deleteAppDataOnUninstall": false,
-      "artifactName": "StickPilot-${version}-win-${arch}-setup.${ext}"
+      "artifactName": "StickPilot-${version}-win-${arch}-setup.${ext}",
+      "include": "scripts/installer.nsh"
     },
     "afterSign": "scripts/sign-mac.cjs"
   }

@@ -12,7 +12,7 @@ import { Recorder } from './recorder';
 import { DoubleTap } from './doubleTap';
 import { TrayRemote } from './tray';
 import { Typer } from './typing';
-import { adb } from './adb';
+import { adb, shutdownAdb } from './adb';
 import type { AppInfo, ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
 
 // Before StickPilot the app was called "firetv", which named its data folder:
@@ -481,6 +481,7 @@ app.on('will-quit', (e) => {
     return;
   }
   devices.stop();
+  shutdownAdb();
   doubleShift.stop();
   tray.destroy();
   flushSettings();

@@ -1,4 +1,4 @@
-import { execFile, spawn, ChildProcess } from 'child_process';
+import { execFile, execFileSync, spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import { adbPath } from './paths';
 import type { AdbState, Transport } from '../shared/types';
@@ -8,21 +8,34 @@ export interface AdbOptions {
   timeout?: number;
 }
 
+/** adb processes started by StickPilot and still running, so quitting can end them all */
+const running = new Set<ChildProcess>();
+let shutDown = false;
+function track<T extends ChildProcess>(proc: T): T {
+  // Started by work still finishing during quit: adb must not come back once stopped
+  if (shutDown) { proc.kill(); return proc; }
+  running.add(proc);
+  proc.once('exit', () => running.delete(proc));
+  proc.once('error', () => running.delete(proc));
+  return proc;
+}
+
 export function adb(args: string[], { serial, timeout = 15000 }: AdbOptions = {}): Promise<string> {
   const full = serial ? ['-s', serial, ...args] : args;
+  if (shutDown) return Promise.reject(new Error(`adb ${args[0]}: StickPilot is quitting`));
   return new Promise((resolve, reject) => {
-    execFile(adbPath(), full, { timeout, windowsHide: true }, (err, stdout, stderr) => {
+    track(execFile(adbPath(), full, { timeout, windowsHide: true }, (err, stdout, stderr) => {
       if (err && err.killed) reject(new Error(`adb ${args[0]} timed out`));
       else if (err) reject(new Error(`adb ${args[0]}: ${(stderr || stdout || err.message).trim()}`));
       // adb for Windows writes its output in text mode: every \n arrives as \r\n
       else resolve(stdout.replace(/\r\n/g, '\n'));
-    });
+    }));
   });
 }
 
 // windowsHide: adb is a console program; without it every call flashes a console window on Windows
 export function spawnAdb(args: string[], serial?: string): ChildProcess {
-  return spawn(adbPath(), serial ? ['-s', serial, ...args] : args, { windowsHide: true });
+  return track(spawn(adbPath(), serial ? ['-s', serial, ...args] : args, { windowsHide: true }));
 }
 
 /**
@@ -30,8 +43,9 @@ export function spawnAdb(args: string[], serial?: string): ChildProcess {
  * this call exits, and must not hold on to (and so keep open) any of our handles.
  */
 export function startServer(timeout = 15000): Promise<void> {
+  if (shutDown) return Promise.resolve();
   return new Promise((resolve) => {
-    const proc = spawn(adbPath(), ['start-server'], { stdio: 'ignore', windowsHide: true });
+    const proc = track(spawn(adbPath(), ['start-server'], { stdio: 'ignore', windowsHide: true }));
     const timer = setTimeout(() => { proc.kill(); resolve(); }, timeout);
     const done = () => { clearTimeout(timer); resolve(); };
     proc.once('exit', done);
@@ -110,4 +124,19 @@ export class DeviceTracker extends EventEmitter {
     this.proc?.kill();
     this.proc = null;
   }
+}
+
+/**
+ * On quit: ends StickPilot's adb calls (one still starting the server would start it
+ * again), then stops the adb server. The server outlives the call that started it and,
+ * left running, keeps StickPilot's files in use (on Windows the folder can't be deleted
+ * or updated).
+ */
+export function shutdownAdb(): void {
+  shutDown = true;
+  for (const proc of running) proc.kill();
+  running.clear();
+  try {
+    execFileSync(adbPath(), ['kill-server'], { stdio: 'ignore', timeout: 3000, windowsHide: true });
+  } catch { /* no server running */ }
 }
