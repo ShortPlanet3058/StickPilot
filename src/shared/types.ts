@@ -177,6 +177,10 @@ export interface StickPilotApi {
   type(text: string): void;
   /** Deletes the character before the cursor */
   backspace(): void;
+  /** Finger on the device screen (phones, tablets): 0 down, 1 up, 2 move; coordinates in video pixels */
+  touch(action: 0 | 1 | 2, x: number, y: number, width: number, height: number): void;
+  /** Scroll at a point, in wheel notches (positive: right, up) */
+  scroll(x: number, y: number, width: number, height: number, h: number, v: number): void;
   /** Long-press Home: Fire TV quick settings. Resolves once the press is done (about 1 s) */
   quickSettings(): Promise<void>;
   /** Types the computer's clipboard text on the device */

@@ -3,6 +3,7 @@ import { AudioPlayer } from './audio';
 import { DevicePanel } from './devicePanel';
 import { icon } from './icons';
 import { bindKeyboard } from './keyboard';
+import { bindTouch } from './touch';
 import { bindRemote, flashKey, isMac, layoutFor, MOD, renderRemote, triggerQuickSettings } from './remote';
 import { Video } from './video';
 import type { DeviceInfo, DeviceKind, ScanResult, StickPilotApi, ProfileSet, SessionMode, SessionStatus, Settings, Transport } from '../shared/types';
@@ -490,6 +491,7 @@ function renderFavorites(): void {
 function renderRemotePanel(): void {
   renderFavorites();
   const kind = device(state.current)?.kind ?? 'firetv';
+  $('stage').classList.toggle('touch', kind === 'phone');
   if (kind === state.remoteKind) return;
   state.remoteKind = kind;
   $('remote-buttons').innerHTML = renderRemote(kind);
@@ -497,6 +499,7 @@ function renderRemotePanel(): void {
   const rows: [string, string][] = [
     ...(hasDpad ? [['← ↑ → ↓', 'Navigate'], ['Enter', 'OK']] as [string, string][] : []),
     ['Esc', 'Back'],
+    ...(kind === 'phone' ? [['Click', 'Tap'], ['Drag', 'Swipe'], ['Right\u00a0click', 'Back'], ['Wheel', 'Scroll']] as [string, string][] : []),
     ['A–Z, 0–9', 'Type on the device'],
     ['Backspace', 'Delete a character'],
     [`${MOD}H`, 'Home'], [`${MOD}M`, 'Menu'],
@@ -1027,7 +1030,12 @@ function wire(): void {
     toggleRecording: () => void toggleRecording(),
     toggleDevicePanel: () => devicePanel.toggle(),
   });
-  $('stage').addEventListener('mousedown', () => $('stage').focus());
+  bindTouch($<HTMLCanvasElement>('screen'), api, {
+    enabled: () => isRunning() && liveMode() === 'mirror' && device(state.current)?.kind === 'phone',
+    flash: (code, down) => flashKey($('remote-buttons'), code, down),
+  });
+  // pointerdown: touch cancels the mousedown that would otherwise follow
+  $('stage').addEventListener('pointerdown', () => $('stage').focus());
   $('stage').addEventListener('mousemove', showFsBar);
 
   // Device and session updates

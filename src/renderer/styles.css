@@ -357,6 +357,8 @@ body.mac .toolbar { padding-left: 80px; }
   overflow: hidden;
 }
 #screen { width: 100%; height: 100%; object-fit: contain; }
+/* phones and tablets: the picture is a touchscreen */
+#stage.touch #screen { cursor: pointer; touch-action: none; }
 
 .overlay {
   position: absolute;

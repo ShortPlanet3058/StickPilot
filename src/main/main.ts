@@ -301,6 +301,11 @@ ipcMain.on('key', (_e, keycode: number, action: 0 | 1, repeat: number) => {
 });
 ipcMain.on('tap', (_e, keycode: number) => { session.tap(keycode); typer.invalidate(); });
 ipcMain.on('text', (_e, text: string) => session.text(text));
+ipcMain.on('touch', (_e, action: 0 | 1 | 2, x: number, y: number, w: number, h: number) => {
+  session.touch(action, x, y, w, h);
+  if (action === 1) typer.invalidate(); // a tap may have opened another screen
+});
+ipcMain.on('scroll', (_e, x: number, y: number, w: number, h: number, dx: number, dy: number) => session.scroll(x, y, w, h, dx, dy));
 ipcMain.on('type', (_e, text: string) => typer.type(text));
 ipcMain.on('backspace', () => typer.backspace());
 ipcMain.on('pasteClipboard', async () => { const t = await clipboard.readText(); if (t) typer.type(t); });

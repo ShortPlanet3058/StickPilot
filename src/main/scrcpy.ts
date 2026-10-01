@@ -24,6 +24,10 @@ const PTS_MASK = (1n << 61n) - 1n;
 
 const MSG_INJECT_KEYCODE = 0;
 const MSG_INJECT_TEXT = 1;
+const MSG_INJECT_TOUCH = 2;
+const MSG_INJECT_SCROLL = 3;
+// scrcpy's "generic finger" pointer: injected as a touchscreen finger, not a mouse
+const POINTER_GENERIC_FINGER = 0xfffffffffffffffen;
 const MSG_RESET_VIDEO = 17; // restarts the encoder, which sends a fresh key frame at once
 
 async function pushServer(serial: string, jar = DEVICE_JAR): Promise<void> {
@@ -228,6 +232,44 @@ export class Session extends EventEmitter {
   tap(keycode: number): void {
     this.key(keycode, 0);
     this.key(keycode, 1);
+  }
+
+  /**
+   * A finger on the screen: action 0 = down, 1 = up, 2 = move. x, y are in the picture's
+   * pixels, and width × height must be the size of the video being received: the server
+   * ignores events made for another size (after a rotation, say).
+   */
+  touch(action: 0 | 1 | 2, x: number, y: number, width: number, height: number): void {
+    if (!this.control) return;
+    const msg = Buffer.alloc(32);
+    msg.writeUInt8(MSG_INJECT_TOUCH, 0);
+    msg.writeUInt8(action, 1);
+    msg.writeBigUInt64BE(POINTER_GENERIC_FINGER, 2);
+    msg.writeInt32BE(Math.round(x), 10);
+    msg.writeInt32BE(Math.round(y), 14);
+    msg.writeUInt16BE(width, 18);
+    msg.writeUInt16BE(height, 20);
+    msg.writeUInt16BE(action === 1 ? 0 : 0xffff, 22); // pressure, 16-bit fixed point
+    msg.writeUInt32BE(0, 24); // action button
+    msg.writeUInt32BE(0, 28); // buttons
+    this.control.write(msg);
+  }
+
+  /** Scroll wheel at a point; h and v in notches (positive: right, up), up to ±16 */
+  scroll(x: number, y: number, width: number, height: number, h: number, v: number): void {
+    if (!this.control) return;
+    // Signed 16-bit fixed point of the value divided by 16, as scrcpy's client sends it
+    const fp = (n: number) => Math.max(-0x8000, Math.min(0x7fff, Math.round(Math.max(-1, Math.min(1, n / 16)) * 0x8000)));
+    const msg = Buffer.alloc(21);
+    msg.writeUInt8(MSG_INJECT_SCROLL, 0);
+    msg.writeInt32BE(Math.round(x), 1);
+    msg.writeInt32BE(Math.round(y), 5);
+    msg.writeUInt16BE(width, 9);
+    msg.writeUInt16BE(height, 11);
+    msg.writeInt16BE(fp(h), 13);
+    msg.writeInt16BE(fp(v), 15);
+    msg.writeUInt32BE(0, 17);
+    this.control.write(msg);
   }
 
   resetVideo(): void {
