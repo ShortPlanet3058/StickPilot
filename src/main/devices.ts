@@ -266,6 +266,21 @@ function humanizeConnectError(out: string, host: string): string {
   return detail ? `Could not connect to ${host}: ${detail}` : `Could not connect to ${host}.`;
 }
 
+/**
+ * This computer's address on the local network, for phones to reach it: the one
+ * holding the default route, else the first private address of a physical adapter.
+ */
+export async function lanAddress(): Promise<string | null> {
+  const primary = await defaultRouteAddress();
+  if (primary && !primary.startsWith('169.254.')) return primary;
+  for (const [name, addrs] of Object.entries(os.networkInterfaces())) {
+    if (VIRTUAL.test(name)) continue;
+    const a = (addrs ?? []).find((x) => x.family === 'IPv4' && !x.internal && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(x.address));
+    if (a) return a.address;
+  }
+  return null;
+}
+
 /** The address this computer uses to reach the internet (no packet is sent), or null offline */
 function defaultRouteAddress(): Promise<string | null> {
   return new Promise((resolve) => {

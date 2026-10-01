@@ -42,6 +42,7 @@ const paths: Record<string, string> = {
   camera: '<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
   record: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/>',
   stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/>',
+  backspace: '<path d="M21 5H8.5L3 12l5.5 7H21z"/><path d="M12 9.5l5 5M17 9.5l-5 5"/>',
   exitFullscreen: '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>',
 };
 

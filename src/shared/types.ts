@@ -79,6 +79,10 @@ export interface Settings {
   stayInMenuBar: boolean;
   /** Windows: the "still running in the notification area" balloon was shown once */
   trayHintShown: boolean;
+  /** Serve the phone remote page on the local network */
+  phoneRemote: boolean;
+  /** Secret part of the phone remote link (in its QR code) */
+  phoneToken: string;
 }
 
 export interface VideoPacket {
@@ -117,6 +121,29 @@ export interface DeviceStatusInfo {
 }
 
 /** App artwork as data: URLs */
+/** What the phone remote page shows */
+export interface PhoneState {
+  session: 'idle' | 'connecting' | 'running' | 'ended';
+  mode: SessionMode | null;
+  /** The device in use, or the one Connect would open */
+  device: { name: string; kind: DeviceKind } | null;
+  canConnect: boolean;
+  /** Pinned apps of that device, in order */
+  favorites: string[];
+  /** Why the last session ended, when it wasn't the user's choice */
+  message?: string;
+}
+
+export interface PhoneRemoteInfo {
+  enabled: boolean;
+  /** Link phones open (in the QR code); null when this computer has no network address */
+  url: string | null;
+  /** The link as a QR code, SVG markup */
+  qr: string | null;
+  /** Phones with the page open right now */
+  phones: number;
+}
+
 export interface AppArt {
   /** Wide TV launcher banner (usually 320x180) */
   banner?: string;
@@ -177,6 +204,13 @@ export interface StickPilotApi {
   type(text: string): void;
   /** Deletes the character before the cursor */
   backspace(): void;
+  getPhoneRemote(): Promise<PhoneRemoteInfo>;
+  setPhoneRemote(on: boolean): Promise<PhoneRemoteInfo>;
+  /** Replaces the link: phones using the old one stop working */
+  newPhoneLink(): Promise<PhoneRemoteInfo>;
+  onPhoneRemote(cb: (info: PhoneRemoteInfo) => void): void;
+  /** The tray menu asked to show the phone remote panel */
+  onOpenPhoneRemote(cb: () => void): void;
   /** Finger on the device screen (phones, tablets): 0 down, 1 up, 2 move; coordinates in video pixels */
   touch(action: 0 | 1 | 2, x: number, y: number, width: number, height: number): void;
   /** Scroll at a point, in wheel notches (positive: right, up) */

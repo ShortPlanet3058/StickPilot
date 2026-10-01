@@ -96,7 +96,8 @@ Storage, memory, CPU temperature and Wi-Fi signal at a glance, plus Sleep, Wake 
 - **Sound on your computer**, optional: StickPilot warns you and offers to turn it off if the picture starts to lag.
 - **Screenshots** at the TV's full resolution, and **recordings** of the screen as MP4.
 - **Drag and drop:** drop an APK to install it, or any other file to copy it to the device's Download folder.
-- **Not only Fire TV:** Android TV, Google TV, phones and tablets work too, each with a remote that fits them.
+- **Your phone as the remote:** turn on Phone remote and scan the QR code. The remote opens in the phone's browser (iPhone or Android, nothing to install), with arrows or a swipe touchpad, typing and your apps. The phone talks to StickPilot on the computer, so both must be on the same Wi-Fi.
+- **Not only Fire TV:** Android TV, Google TV, phones and tablets work too, each with a remote that fits them. On phones and tablets, click the picture to tap, drag to swipe and scroll with the wheel; right click is Back.
 
 ## Getting started
 
@@ -231,6 +232,8 @@ evaluates code in the main process (`STICKPILOT_DEBUG=1` also exposes `globalThi
 | `src/renderer/video.ts` | H.264 decoding with WebCodecs |
 | `src/renderer/audio.ts` | Opus decoding and low-latency playback |
 | `src/renderer/apps.ts`, `devicePanel.ts`, `tray.ts` | App launcher, device panel, menu-bar remote |
+| `src/renderer/touch.ts` | Mouse on the picture as a finger, for phones and tablets |
+| `src/main/phoneRemote.ts`, `src/renderer/phone.ts`, `phonePanel.ts` | Phone remote: the local web server, the page phones open, and its QR code panel |
 | `helper/` | On-device icon dumper (Java) and the macOS Right Shift helper (Swift) |
 | `tools/` | Benchmark and lag probe used to tune the profiles, plus the original shell script |
 

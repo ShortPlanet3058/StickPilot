@@ -12,6 +12,8 @@ export interface TrayHooks {
   preload: string;
   page: string;
   showMain(): void;
+  /** Opens the window on the phone remote panel (QR code) */
+  showPhoneRemote(): void;
   quit(): void;
   /** Sends a key press (down + up) to the connected device; false when nothing is connected */
   tap(keycode: number): boolean;
@@ -77,6 +79,7 @@ export class TrayRemote {
     return Menu.buildFromTemplate([
       { label: 'Show mini remote', click: () => this.show() },
       { label: 'Open StickPilot', click: () => this.hooks.showMain() },
+      { label: 'Use your phone as the remote…', click: () => this.hooks.showPhoneRemote() },
       { type: 'separator' },
       {
         label: 'Use media keys for the TV',

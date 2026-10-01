@@ -663,6 +663,20 @@ button.link:hover { background: none; text-decoration: underline; }
 .sheet-search input { width: 100%; height: 36px; }
 .sheet-body { flex: 1; overflow-y: auto; padding: 0 20px 24px; }
 .sheet-section { margin: 16px 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--faint); }
+/* Phone remote panel */
+.phone-intro { margin: 4px 0 16px; color: var(--muted); }
+.phone-toggle { margin-bottom: 20px; font-size: 14px; color: var(--text); }
+.phone-qr { width: 232px; margin: 0 auto; padding: 8px; border-radius: 14px; background: #fff; }
+.phone-qr svg { display: block; width: 100%; height: auto; }
+.phone-scan { margin: 10px 0 14px; text-align: center; font-size: 12px; color: var(--muted); }
+.phone-link { display: flex; align-items: center; gap: 6px; padding: 6px 6px 6px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.phone-link code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; user-select: text; }
+.phone-count { margin: 12px 0 0; font-size: 12px; color: var(--faint); }
+.phone-count.ok { color: var(--ok); }
+.phone-tips { margin: 16px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+.phone-tips li + li { margin-top: 6px; }
+.phone-new { margin-top: 16px; }
+
 .sheet-empty { padding: 24px 0; text-align: center; color: var(--faint); }
 .sheet-loading { padding: 48px 0; text-align: center; color: var(--muted); }
 

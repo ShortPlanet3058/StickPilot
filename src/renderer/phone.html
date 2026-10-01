@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:">
+  <meta name="theme-color" content="#0f1012">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="StickPilot">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon.png">
+  <title>StickPilot remote</title>
+  <link rel="stylesheet" href="phone.css">
+</head>
+<body>
+  <header class="top">
+    <img src="logo.png" width="28" height="28" alt="">
+    <div class="title">
+      <span id="name">StickPilot</span>
+      <span id="status" class="status"></span>
+    </div>
+    <button id="power" class="round" aria-label="Disconnect"></button>
+  </header>
+
+  <main id="remote" hidden>
+    <section id="favs" class="favs" aria-label="Apps"></section>
+    <div id="chips" class="chips"></div>
+
+    <div class="pad-area">
+      <div id="dpad" class="dpad" aria-label="Arrows and OK"></div>
+      <div id="touchpad" class="touchpad" hidden aria-label="Touchpad: swipe to move, tap for OK">
+        <span>Swipe to move<br>Tap for OK</span>
+      </div>
+    </div>
+    <div class="pad-switch" role="radiogroup" aria-label="Arrows">
+      <button data-pad="dpad" role="radio">Buttons</button>
+      <button data-pad="touchpad" role="radio">Touchpad</button>
+    </div>
+
+    <div id="keys" class="keys"></div>
+
+    <form id="type" class="type" autocomplete="off">
+      <input id="type-text" type="text" placeholder="Type on the TV" enterkeyhint="send" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <button type="button" id="type-back" class="square" aria-label="Delete a character"></button>
+      <button type="submit" id="type-send" class="square accent" aria-label="Send"></button>
+    </form>
+  </main>
+
+  <section id="idle" class="idle" hidden>
+    <div class="idle-icon"></div>
+    <h1 id="idle-title">Not connected</h1>
+    <p id="idle-text"></p>
+    <button id="connect" class="primary">Connect</button>
+  </section>
+
+  <section id="apps" class="apps" hidden aria-label="All apps">
+    <header class="apps-head">
+      <h2>Apps</h2>
+      <button id="apps-close" class="round" aria-label="Close"></button>
+    </header>
+    <input id="apps-search" type="search" placeholder="Search apps" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <div id="apps-list" class="apps-list"></div>
+  </section>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="phone.js"></script>
+</body>
+</html>

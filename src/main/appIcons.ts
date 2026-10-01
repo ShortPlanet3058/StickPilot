@@ -28,6 +28,12 @@ function fromCache(pkgs: string[]): Record<string, AppArt> {
   return out;
 }
 
+/** The cached logo file of an app, the TV banner first, or null */
+export function artFile(pkg: string): string | null {
+  for (const kind of ['banner', 'icon'] as const) if (fs.existsSync(file(pkg, kind))) return file(pkg, kind);
+  return null;
+}
+
 /** Banners and icons for the given packages; fetches only those not cached (all of them with refresh) */
 export async function appArt(serial: string, pkgs: string[], refresh = false): Promise<Record<string, AppArt>> {
   fs.mkdirSync(cacheDir(), { recursive: true });

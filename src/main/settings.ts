@@ -19,6 +19,8 @@ const DEFAULTS: Settings = {
   doubleShift: true,
   stayInMenuBar: true,
   trayHintShown: false,
+  phoneRemote: false,
+  phoneToken: '',
 };
 
 const file = () => path.join(app.getPath('userData'), 'settings.json');

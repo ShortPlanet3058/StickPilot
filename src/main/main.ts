@@ -2,18 +2,19 @@ import { app, BrowserWindow, clipboard, ipcMain, Menu, shell, systemPreferences 
 import { execFile } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { DeviceManager, normalizeHost } from './devices';
+import { DeviceManager, lanAddress, normalizeHost } from './devices';
 import { profileSetFor } from './profiles';
 import { detectEncoder, listApps, Session } from './scrcpy';
 import { flushSettings, getSettings, updateSettings } from './settings';
-import { appArt, cachedAppArt } from './appIcons';
+import { appArt, artFile, cachedAppArt } from './appIcons';
+import { newToken, PhoneRemote } from './phoneRemote';
 import { adbPath } from './paths';
 import { Recorder } from './recorder';
 import { DoubleTap } from './doubleTap';
 import { TrayRemote } from './tray';
 import { Typer } from './typing';
 import { adb, shutdownAdb } from './adb';
-import type { AppInfo, ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
+import type { AppInfo, PhoneState, ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
 
 // Before StickPilot the app was called "firetv", which named its data folder:
 // carry the settings and cached app logos over once
@@ -54,6 +55,7 @@ function setStatus(next: SessionStatus): void {
   if (recorder.active && !(next.state === 'running' && next.mode === 'mirror')) send('record:stopped', recorder.stop());
   status = next;
   sendAll('session:status', status);
+  phone.notify();
   const notice = tray.updateMediaKeys(status.state === 'running');
   if (notice) sendAll('notice', notice);
 }
@@ -62,6 +64,7 @@ function setStatus(next: SessionStatus): void {
 
 devices.on('changed', (list) => {
   sendAll('devices:changed', list);
+  phone.notify();
   // The mirrored device disappeared (unplugged, network drop, TV turned off)
   const s = status;
   if ((s.state === 'running' || s.state === 'connecting')
@@ -164,16 +167,14 @@ ipcMain.handle('devices:remove', async (_e, key: string, serials: string[]) => {
 // ---- Apps
 
 const appsCache = new Map<string, { at: number; apps: AppInfo[] }>();
-ipcMain.handle('apps:list', async (_e, serial: string, refresh: boolean) => {
+async function appsOf(serial: string, refresh = false): Promise<AppInfo[]> {
   const hit = appsCache.get(serial);
   if (hit && !refresh && Date.now() - hit.at < 5 * 60_000) return hit.apps;
   const apps = await listApps(serial);
   appsCache.set(serial, { at: Date.now(), apps });
   return apps;
-});
-ipcMain.handle('apps:art', (_e, serial: string, pkgs: string[], refresh: boolean) => appArt(serial, pkgs, refresh));
-ipcMain.handle('apps:cachedArt', (_e, pkgs: string[]) => cachedAppArt(pkgs));
-ipcMain.handle('apps:launch', async (_e, serial: string, pkg: string) => {
+}
+async function launchApp(serial: string, pkg: string): Promise<boolean> {
   typer.invalidate();
   // TV apps declare the leanback launcher category; phone apps the regular one
   for (const category of ['android.intent.category.LEANBACK_LAUNCHER', 'android.intent.category.LAUNCHER']) {
@@ -181,7 +182,11 @@ ipcMain.handle('apps:launch', async (_e, serial: string, pkg: string) => {
     if (/Events injected: 1/.test(out)) return true;
   }
   return false;
-});
+}
+ipcMain.handle('apps:list', (_e, serial: string, refresh: boolean) => appsOf(serial, refresh));
+ipcMain.handle('apps:art', (_e, serial: string, pkgs: string[], refresh: boolean) => appArt(serial, pkgs, refresh));
+ipcMain.handle('apps:cachedArt', (_e, pkgs: string[]) => cachedAppArt(pkgs));
+ipcMain.handle('apps:launch', (_e, serial: string, pkg: string) => launchApp(serial, pkg));
 ipcMain.handle('apps:stop', async (_e, serial: string, pkg: string) => {
   await adb(['shell', 'am', 'force-stop', pkg], { serial }).catch(() => {});
 });
@@ -201,17 +206,19 @@ ipcMain.handle('devices:forgetNetwork', async (_e, host: string) => {
 });
 ipcMain.handle('profiles:for', (_e, serial: string) => profilesFor(serial));
 ipcMain.handle('session:start', (_e, serial: string, profileId: string, mode: SessionMode) => start(serial, profileId, mode));
-ipcMain.handle('session:stop', async () => {
+async function stopSession(): Promise<void> {
   const serial = status.state === 'idle' ? '' : status.serial;
   await session.stop();
   setStatus(serial ? { state: 'ended', serial, cause: 'user', reason: '' } : { state: 'idle' });
-});
-ipcMain.handle('session:status', () => status);
-ipcMain.handle('session:connectRemote', async (_e, serial?: string) => {
+}
+async function connectRemote(serial?: string): Promise<void> {
   const target = serial || getSettings().lastSerial;
   if (!target) throw new Error('No device used yet.');
   await start(target, getSettings().profileBySerial[target] ?? '', 'remote');
-});
+}
+ipcMain.handle('session:stop', () => stopSession());
+ipcMain.handle('session:status', () => status);
+ipcMain.handle('session:connectRemote', (_e, serial?: string) => connectRemote(serial));
 ipcMain.on('window:showMain', () => showMain());
 ipcMain.on('system:openAccessibility', () => {
   // Asking through the system prompt adds this exact build to the Accessibility list; a
@@ -311,11 +318,12 @@ ipcMain.on('backspace', () => typer.backspace());
 ipcMain.on('pasteClipboard', async () => { const t = await clipboard.readText(); if (t) typer.type(t); });
 // Fire OS opens quick settings only for a key with the long-press flag, which scrcpy's
 // injection can't set, so this goes through adb (about 1 s).
-ipcMain.handle('quickSettings', async () => {
+async function quickSettings(): Promise<void> {
   if (status.state !== 'running') return;
   typer.invalidate();
   await adb(['shell', 'input', 'keyevent', '--longpress', '3'], { serial: status.serial }).catch(() => {});
-});
+}
+ipcMain.handle('quickSettings', () => quickSettings());
 ipcMain.on('window:toggleFullscreen', () => { if (win) win.setFullScreen(!win.isFullScreen()); });
 
 // Remote-only view: shrink to a remote-sized window, and restore the size afterwards
@@ -339,7 +347,86 @@ ipcMain.on('window:compact', (_e, on: boolean) => {
 });
 ipcMain.on('window:onTop', (_e, on: boolean) => win?.setAlwaysOnTop(on, 'floating'));
 ipcMain.handle('settings:get', () => getSettings());
-ipcMain.handle('settings:set', (_e, patch: Partial<Settings>) => { updateSettings(patch); });
+ipcMain.handle('settings:set', (_e, patch: Partial<Settings>) => {
+  updateSettings(patch);
+  if (patch.favoriteApps) phone.notify();
+});
+
+// ---- Phone remote
+
+/** The device the phone controls: the one in use, else the last used, else any ready one */
+function phoneTarget(): string | null {
+  if (status.state === 'running' || status.state === 'connecting') return status.serial;
+  const last = getSettings().lastSerial;
+  if (last && devices.get(last)?.state === 'device') return last;
+  return devices.list().find((d) => d.state === 'device' && d.identified)?.serial ?? last ?? null;
+}
+
+function phoneState(): PhoneState {
+  const serial = phoneTarget();
+  const d = serial ? devices.get(serial) : undefined;
+  const s = status;
+  const live = (s.state === 'running' || s.state === 'connecting') && s.serial === serial;
+  return {
+    session: live ? s.state as 'running' | 'connecting' : s.state === 'ended' && s.serial === serial ? 'ended' : 'idle',
+    mode: live ? s.mode : null,
+    device: d ? { name: d.name, kind: d.kind } : null,
+    canConnect: d?.state === 'device',
+    favorites: d ? getSettings().favoriteApps[d.hardwareId || d.serial] ?? [] : [],
+    message: s.state === 'ended' && s.cause !== 'user' ? s.reason : undefined,
+  };
+}
+
+const phoneToken = () => {
+  if (!getSettings().phoneToken) updateSettings({ phoneToken: newToken() });
+  return getSettings().phoneToken;
+};
+
+const phone = new PhoneRemote({
+  state: phoneState,
+  key: (code, action, repeat) => { session.key(code, action, repeat); typer.invalidate(); },
+  tap: (code) => { session.tap(code); typer.invalidate(); },
+  type: (text) => typer.type(text),
+  backspace: () => typer.backspace(),
+  quickSettings,
+  connect: async () => {
+    const serial = phoneTarget();
+    if (!serial) throw new Error('No device is ready.');
+    if (status.state === 'running' && status.serial === serial) return;
+    await connectRemote(serial);
+  },
+  disconnect: () => stopSession(),
+  apps: async () => {
+    const serial = phoneTarget();
+    if (!serial) return [];
+    const apps = await appsOf(serial);
+    // Logos the computer hasn't fetched yet arrive in the background; the phone asks again
+    void appArt(serial, apps.map((a) => a.pkg)).catch(() => {});
+    return apps;
+  },
+  launch: async (pkg) => { const serial = phoneTarget(); return serial ? launchApp(serial, pkg) : false; },
+  artFile,
+  address: lanAddress,
+  changed: (info) => sendAll('phone:changed', info),
+}, {
+  pageDir: path.join(__dirname, '..', 'renderer'),
+  touchIcon: path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), 'assets', 'icon-512.png'),
+}, phoneToken);
+
+ipcMain.handle('phone:get', () => phone.info());
+ipcMain.handle('phone:set', async (_e, on: boolean) => {
+  updateSettings({ phoneRemote: on });
+  if (on) await phone.start();
+  else await phone.stop();
+  return phone.info();
+});
+ipcMain.handle('phone:newLink', async () => {
+  updateSettings({ phoneToken: newToken() });
+  phone.dropClients();
+  const info = await phone.info();
+  sendAll('phone:changed', info);
+  return info;
+});
 
 // ---- App lifecycle
 
@@ -405,6 +492,7 @@ const tray = new TrayRemote({
   preload: path.join(__dirname, '..', 'preload', 'preload.js'),
   page: path.join(__dirname, '..', 'renderer', 'tray.html'),
   showMain: () => showMain(),
+  showPhoneRemote: () => { showMain(); win?.webContents.send('phone:open'); },
   quit: () => app.quit(),
   tap: (code) => { if (status.state !== 'running') return false; session.tap(code); return true; },
   mediaKeysEnabled: () => getSettings().mediaKeys,
@@ -476,6 +564,9 @@ app.whenReady().then(async () => {
   await devices.start();
   // Reconnect remembered network devices quietly; failures just leave them absent
   for (const host of getSettings().networkHosts) void devices.connectNetwork(host);
+  if (getSettings().phoneRemote) {
+    phone.start().catch((e) => send('notice', `The phone remote could not start: ${(e as Error).message}`));
+  }
 });
 
 app.on('will-quit', (e) => {
@@ -485,6 +576,7 @@ app.on('will-quit', (e) => {
     void session.stop().then(() => app.quit());
     return;
   }
+  void phone.stop();
   devices.stop();
   shutdownAdb();
   doubleShift.stop();

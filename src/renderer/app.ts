@@ -1,6 +1,7 @@
 import { AppsPanel, appIcon, paintAvatars } from './apps';
 import { AudioPlayer } from './audio';
 import { DevicePanel } from './devicePanel';
+import { PhonePanel } from './phonePanel';
 import { icon } from './icons';
 import { bindKeyboard } from './keyboard';
 import { bindTouch } from './touch';
@@ -745,6 +746,11 @@ const devicePanel = new DevicePanel($('device-panel'), api, {
   done: () => focusTarget().focus(),
 });
 
+const phonePanel = new PhonePanel($('phone-panel'), api, {
+  toast: (m, kind) => toast(m, { kind }),
+  done: () => focusTarget().focus(),
+});
+
 function toggleApps(): void {
   if (!isRunning()) return;
   apps.toggle();
@@ -940,6 +946,9 @@ function wire(): void {
     }
   });
   $('btn-discover').addEventListener('click', () => void discover(true));
+  $('btn-phone').innerHTML = `${icon('phone', 16)}<span>Phone remote</span>`;
+  $('btn-phone').addEventListener('click', () => phonePanel.open());
+  api.onOpenPhoneRemote(() => { if (apps.isOpen) apps.close(); if (devicePanel.isOpen) devicePanel.close(); phonePanel.open(); });
   document.addEventListener('mousedown', (e) => {
     const t = e.target as HTMLElement;
     if (!$('card-menu').hidden && !t.closest('#card-menu') && !t.closest('[data-more], [data-more-host]')) $('card-menu').hidden = true;
@@ -1018,7 +1027,7 @@ function wire(): void {
 
   bindKeyboard(api, {
     active: () => state.view !== 'home' && isRunning(),
-    menuOpen: () => state.menuOpen || apps.isOpen || devicePanel.isOpen,
+    menuOpen: () => state.menuOpen || apps.isOpen || devicePanel.isOpen || phonePanel.isOpen,
     flash: (code, down) => flashKey($('remote-buttons'), code, down),
     toggleFullscreen,
     toggleStats,
