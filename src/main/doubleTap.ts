@@ -6,13 +6,18 @@
 // its hook thread waits on the main queue while the main thread waits on it.
 // The helper takes StickPilot's Accessibility permission (the app starts it).
 //
-// Windows / Linux: uiohook-napi in-process (no such main-queue hand-off there).
+// Windows / Linux X11: uiohook-napi in-process (no such main-queue hand-off there).
 // Either way only Right Shift is looked at; nothing typed is kept.
+//
+// Linux Wayland: apps never see keys typed into other apps, so no double-tap there.
+// A regular system shortcut (Ctrl+Alt+R by default) is registered with the desktop
+// through its GlobalShortcuts portal instead (portalShortcut.ts).
 
 import { ChildProcess, spawn } from 'child_process';
 import fs from 'fs';
 import { systemPreferences } from 'electron';
 import { keysHelperPath } from './paths';
+import { PortalShortcut, portalShortcutWanted } from './portalShortcut';
 
 const TAP_MAX_MS = 300; // a press longer than this is holding, not tapping
 const BETWEEN_MAX_MS = 400; // second tap must follow the first within this
@@ -22,15 +27,39 @@ export class DoubleTap {
   private running = false;
   private helper: ChildProcess | null = null;
   private restartTimer: NodeJS.Timeout | null = null;
+  /** Linux Wayland only: the desktop-provided shortcut */
+  readonly portal: PortalShortcut | null;
 
-  constructor(private onTrigger: () => void) {}
+  /**
+   * onNotice: a problem found after start() returned (the portal answers asynchronously).
+   * onChange: what opens the remote changed (e.g. the user picked other keys), for the menu.
+   */
+  constructor(private onTrigger: () => void, private onNotice: (message: string) => void = () => {}, onChange: () => void = () => {}) {
+    this.portal = portalShortcutWanted() ? new PortalShortcut(onTrigger, onChange) : null;
+  }
 
   get active(): boolean {
-    return this.running;
+    return this.portal ? this.portal.active : this.running;
+  }
+
+  /** What the user presses, for menus and messages */
+  get label(): string {
+    return this.portal ? this.portal.label : 'Double-tap Right Shift';
   }
 
   /** Starts listening; returns a message when the shortcut can't work yet */
   start(): string | null {
+    if (this.portal) {
+      if (!this.running) {
+        this.running = true;
+        void this.portal.start().then((problem) => {
+          if (!problem) return;
+          this.running = false;
+          this.onNotice(problem);
+        });
+      }
+      return null;
+    }
     if (this.running) return null;
     if (process.platform === 'darwin') {
       if (!systemPreferences.isTrustedAccessibilityClient(false)) {
@@ -100,6 +129,7 @@ export class DoubleTap {
   }
 
   stop(): void {
+    if (this.portal) { this.portal.stop(); this.running = false; return; }
     if (this.restartTimer) { clearTimeout(this.restartTimer); this.restartTimer = null; }
     if (this.helper) {
       const h = this.helper;

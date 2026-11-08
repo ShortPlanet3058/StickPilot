@@ -15,7 +15,8 @@ export class Video {
   onFirstFrame: () => void = () => {};
 
   constructor(private canvas: HTMLCanvasElement, api: StickPilotApi) {
-    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })!;
+    const isLinux = /Linux/i.test(navigator.platform);
+    this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: !isLinux })!;
     api.onConfig(({ codec }) => this.configure(codec));
     api.onPacket(({ data, key, pts, lagMs }) => {
       const d = this.decoder;
@@ -50,7 +51,10 @@ export class Video {
       },
       error: (e) => console.error('decoder', e),
     });
-    this.decoder.configure({ codec, optimizeForLatency: true, hardwareAcceleration: 'prefer-hardware' });
+    // Linux: VA-API / GBM import under X11/XWayland crashes the GPU process (gbm_bo_import -> nullptr),
+    // leaving the canvas black; Chromium's software H.264 decoder takes <1 ms per frame on desktop CPUs.
+    const hardwareAcceleration = /Linux/i.test(navigator.platform) ? 'prefer-software' : 'prefer-hardware';
+    this.decoder.configure({ codec, optimizeForLatency: true, hardwareAcceleration });
   }
 
   private close(): void {
