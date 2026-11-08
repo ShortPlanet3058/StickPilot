@@ -4,6 +4,7 @@
   "version": "0.1.1",
   "description": "StickPilot: mirror and control a Fire TV (or other Android device) from your computer",
   "author": "Finn Vignon",
+  "homepage": "https://github.com/ShortPlanet3058/StickPilot",
   "main": "dist/main/main.js",
   "desktopName": "stickpilot.desktop",
   "private": true,
@@ -34,7 +35,7 @@
   "build": {
     "appId": "app.stickpilot",
     "productName": "StickPilot",
-    "copyright": "Copyright \u00a9 2026 Finn Vignon",
+    "copyright": "Copyright © 2026 Finn Vignon",
     "directories": {
       "output": "release",
       "buildResources": "assets"
