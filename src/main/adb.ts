@@ -69,7 +69,8 @@ export function parseDeviceList(text: string): RawDevice[] {
     const info = Object.fromEntries(rest.map((kv) => kv.split(':') as [string, string]));
     return {
       serial,
-      state: (KNOWN_STATES as string[]).includes(state) ? (state as AdbState) : 'unknown',
+      // Linux without a udev rule for the device: "no permissions (missing udev rules? ...)"
+      state: (KNOWN_STATES as string[]).includes(state) ? (state as AdbState) : /^no permissions/.test(line.slice(serial.length).trim()) ? 'nopermission' : 'unknown',
       // network serials are host:port; USB serials never contain ':'
       transport: serial.includes(':') ? 'network' : 'usb',
       model: (info.model || '').replace(/_/g, ' '),

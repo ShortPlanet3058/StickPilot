@@ -1,5 +1,5 @@
 import { app, BrowserWindow, clipboard, ipcMain, Menu, shell, systemPreferences } from 'electron';
-import { execFile } from 'child_process';
+import { execFile, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { DeviceManager, normalizeHost } from './devices';
@@ -10,10 +10,40 @@ import { appArt, cachedAppArt } from './appIcons';
 import { adbPath } from './paths';
 import { Recorder } from './recorder';
 import { DoubleTap } from './doubleTap';
+import { portalShortcutWanted } from './portalShortcut';
 import { TrayRemote } from './tray';
 import { Typer } from './typing';
 import { adb, shutdownAdb } from './adb';
 import type { AppInfo, ProfileSet, SessionMode, SessionStatus, Settings } from '../shared/types';
+
+// Linux: run as an X11 app (through XWayland on Wayland desktops). Wayland doesn't let apps
+// place their windows, so the mini remote couldn't open under the tray icon. Electron picks
+// the platform before this code runs, so the app menu launcher passes --ozone-platform=x11
+// (linux.executableArgs); started any other way, StickPilot restarts itself once with it.
+// An --ozone-platform given on the command line wins (Electron sets the switch itself when
+// it picks Wayland, so look at the actual arguments).
+if (process.platform === 'linux' && process.env.WAYLAND_DISPLAY && !process.argv.some((a) => a.startsWith('--ozone-platform'))
+  && app.commandLine.getSwitchValue('ozone-platform') !== 'x11') {
+  // An AppImage runs from a temporary mount that goes away when this process exits: start the
+  // AppImage file again (app.relaunch can't, its helper runs from that mount), without the
+  // variables and paths that point into this mount, so it sets up its own
+  const appDir = process.env.APPDIR;
+  const env = { ...process.env };
+  if (process.env.APPIMAGE && appDir) {
+    for (const k of ['APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+    for (const k of ['PATH', 'LD_LIBRARY_PATH', 'XDG_DATA_DIRS', 'GSETTINGS_SCHEMA_DIR']) {
+      const kept = (env[k] ?? '').split(':').filter((d) => d && !d.startsWith(appDir));
+      if (kept.length) env[k] = kept.join(':'); else delete env[k];
+    }
+  }
+  const cmd = [process.env.APPIMAGE || process.execPath, ...process.argv.slice(1), '--ozone-platform=x11'];
+  // Electron leaves some of its files open across exec (app.asar, icudtl.dat…), which would keep
+  // this AppImage's mount alive: bash closes every inherited descriptor above stderr first
+  const closeFds = 'for fd in $(ls /proc/$$/fd); do [ "$fd" -gt 2 ] && eval "exec $fd>&-" 2>/dev/null; done; exec "$@"';
+  const bash = fs.existsSync('/bin/bash') ? '/bin/bash' : null;
+  spawn(bash ?? cmd[0], bash ? ['-c', closeFds, 'stickpilot', ...cmd] : cmd.slice(1), { detached: true, stdio: 'ignore', env }).unref();
+  app.exit(0);
+}
 
 // Before StickPilot the app was called "firetv", which named its data folder:
 // carry the settings and cached app logos over once
@@ -175,9 +205,10 @@ ipcMain.handle('apps:art', (_e, serial: string, pkgs: string[], refresh: boolean
 ipcMain.handle('apps:cachedArt', (_e, pkgs: string[]) => cachedAppArt(pkgs));
 ipcMain.handle('apps:launch', async (_e, serial: string, pkg: string) => {
   typer.invalidate();
-  // TV apps declare the leanback launcher category; phone apps the regular one
+  // TV apps declare the leanback launcher category; phone apps the regular one.
+  // --pct-syskeys 0: devices without physical system keys (e.g. Fire OS 8 sticks) make monkey abort otherwise
   for (const category of ['android.intent.category.LEANBACK_LAUNCHER', 'android.intent.category.LAUNCHER']) {
-    const out = await adb(['shell', 'monkey', '-p', pkg, '-c', category, '1'], { serial, timeout: 10000 }).catch((e) => String(e));
+    const out = await adb(['shell', 'monkey', '--pct-syskeys', '0', '-p', pkg, '-c', category, '1'], { serial, timeout: 10000 }).catch((e) => String(e));
     if (/Events injected: 1/.test(out)) return true;
   }
   return false;
@@ -407,7 +438,10 @@ const tray = new TrayRemote({
   setDoubleShift: (on) => {
     updateSettings({ doubleShift: on });
     applyDoubleShift(true);
+    tray.refreshMenu();
   },
+  shortcutLabel: () => doubleShift.label,
+  configureShortcut: portalShortcutWanted() ? () => void doubleShift.portal?.configure() : null,
   stayInMenuBar: () => getSettings().stayInMenuBar,
   setStayInMenuBar: (on) => { updateSettings({ stayInMenuBar: on }); },
   setMediaKeys: (on) => {
@@ -417,7 +451,11 @@ const tray = new TrayRemote({
   },
 });
 
-const doubleShift = new DoubleTap(() => tray.toggle());
+const doubleShift = new DoubleTap(
+  () => tray.toggle(),
+  (message) => { send('notice', { message }); tray.refreshMenu(); },
+  () => tray.refreshMenu(),
+);
 
 let accessWatch: NodeJS.Timeout | null = null;
 

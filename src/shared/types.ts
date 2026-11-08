@@ -2,8 +2,8 @@
 
 export type Transport = 'usb' | 'network';
 
-/** adb's own states, plus 'unknown' for anything new adb may report */
-export type AdbState = 'device' | 'unauthorized' | 'offline' | 'authorizing' | 'connecting' | 'unknown';
+/** adb's own states, plus 'nopermission' (Linux: no udev rule for the USB device) and 'unknown' for anything new adb may report */
+export type AdbState = 'device' | 'unauthorized' | 'offline' | 'authorizing' | 'connecting' | 'nopermission' | 'unknown';
 
 export type DeviceKind = 'firetv' | 'tv' | 'phone' | 'unknown';
 

@@ -19,6 +19,10 @@ export interface TrayHooks {
   setMediaKeys(on: boolean): void;
   doubleShiftEnabled(): boolean;
   setDoubleShift(on: boolean): void;
+  /** What opens the remote: "Double-tap Right Shift", or the system shortcut's keys on Linux Wayland */
+  shortcutLabel(): string;
+  /** Opens the desktop's dialog to change the system shortcut; null where there is none */
+  configureShortcut: (() => void) | null;
   stayInMenuBar(): boolean;
   setStayInMenuBar(on: boolean): void;
 }
@@ -85,11 +89,14 @@ export class TrayRemote {
         click: (item) => this.hooks.setMediaKeys(item.checked),
       },
       {
-        label: 'Double-tap Right Shift opens this remote',
+        label: `${this.hooks.shortcutLabel()} opens this remote`,
         type: 'checkbox',
         checked: this.hooks.doubleShiftEnabled(),
         click: (item) => this.hooks.setDoubleShift(item.checked),
       },
+      ...(this.hooks.configureShortcut && this.hooks.doubleShiftEnabled()
+        ? [{ label: 'Change shortcut…', click: () => this.hooks.configureShortcut!() }]
+        : []),
       {
         label: process.platform === 'darwin' ? 'Keep running in the menu bar when closed' : 'Keep running in the notification area when closed',
         type: 'checkbox',
@@ -99,6 +106,11 @@ export class TrayRemote {
       { type: 'separator' },
       { label: 'Quit StickPilot', accelerator: 'CommandOrControl+Q', click: () => this.hooks.quit() },
     ]);
+  }
+
+  /** Linux app indicators keep the menu they were given: rebuild it after a setting changes */
+  refreshMenu(): void {
+    if (process.platform === 'linux') this.tray?.setContextMenu(this.menu());
   }
 
   toggle(): void {
@@ -115,8 +127,9 @@ export class TrayRemote {
   show(): void {
     if (!this.tray || !this.popup) return;
     let b = this.tray.getBounds();
-    // Some Linux trays don't report where the icon is: open by the pointer instead
-    if (!b.width) { const p = screen.getCursorScreenPoint(); b = { x: p.x, y: p.y, width: 1, height: 1 }; }
+    // Linux app indicators don't report where the icon is. They sit at the right end of the
+    // panel on the main screen (GNOME top bar, KDE bottom panel): open from that corner.
+    if (!b.width) b = panelCorner();
     const area = screen.getDisplayMatching(b).workArea;
     // Below the icon on macOS (menu bar on top); above it for bottom taskbars. Kept on screen
     // for taskbars on the left or right too.
@@ -153,4 +166,13 @@ export class TrayRemote {
     this.popup?.destroy();
     this.tray?.destroy();
   }
+}
+
+/** The right end of the main screen's panel, as a 1px "icon" bounds; top right when there is none */
+function panelCorner(): Electron.Rectangle {
+  const { bounds, workArea } = screen.getPrimaryDisplay();
+  const right = bounds.x + bounds.width - 1;
+  const bottomGap = bounds.y + bounds.height - (workArea.y + workArea.height);
+  if (bottomGap > 0 && workArea.y === bounds.y) return { x: right, y: workArea.y + workArea.height, width: 1, height: bottomGap };
+  return { x: right, y: bounds.y, width: 1, height: Math.max(workArea.y - bounds.y, 1) };
 }

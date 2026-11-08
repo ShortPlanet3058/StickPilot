@@ -1,10 +1,11 @@
 {
   "name": "stickpilot",
   "productName": "StickPilot",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "StickPilot: mirror and control a Fire TV (or other Android device) from your computer",
   "author": "Finn Vignon",
   "main": "dist/main/main.js",
+  "desktopName": "stickpilot.desktop",
   "private": true,
   "scripts": {
     "build": "node scripts/build.mjs",
@@ -15,7 +16,8 @@
     "helper": "node scripts/build-helper.mjs",
     "dist:mac": "node scripts/build.mjs && electron-builder --mac dmg --x64",
     "keys-helper": "bash scripts/build-keys.sh",
-    "dist:win": "node scripts/build.mjs && electron-builder --win nsis --x64"
+    "dist:win": "node scripts/build.mjs && electron-builder --win nsis --x64 -c.npmRebuild=false",
+    "dist:linux": "node scripts/build.mjs && electron-builder --linux AppImage deb --x64 -c.npmRebuild=false"
   },
   "license": "UNLICENSED",
   "devDependencies": {
@@ -32,7 +34,7 @@
   "build": {
     "appId": "app.stickpilot",
     "productName": "StickPilot",
-    "copyright": "Copyright © 2026 Finn Vignon",
+    "copyright": "Copyright \u00a9 2026 Finn Vignon",
     "directories": {
       "output": "release",
       "buildResources": "assets"
@@ -117,6 +119,43 @@
       "deleteAppDataOnUninstall": false,
       "artifactName": "StickPilot-${version}-win-${arch}-setup.${ext}",
       "include": "scripts/installer.nsh"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon-512.png",
+      "category": "Utility",
+      "synopsis": "Mirror and control a Fire TV or Android device",
+      "maintainer": "Finn Vignon",
+      "executableName": "stickpilot",
+      "extraResources": [
+        {
+          "from": "vendor/linux-x64",
+          "to": "vendor/linux-x64"
+        }
+      ],
+      "syncDesktopName": true,
+      "executableArgs": [
+        "--ozone-platform=x11"
+      ]
+    },
+    "appImage": {
+      "artifactName": "StickPilot-${version}-linux-${arch}.${ext}"
+    },
+    "deb": {
+      "artifactName": "StickPilot-${version}-linux-${arch}.${ext}"
     },
     "afterSign": "scripts/sign-mac.cjs"
   }

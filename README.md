@@ -10,6 +10,7 @@ Watch the TV's picture in a window, drive it with a full remote, type with your 
 [![Latest release](https://img.shields.io/github/v/release/ShortPlanet3058/StickPilot?label=download&color=2563eb&logo=github&cacheSeconds=3600)](https://github.com/ShortPlanet3058/StickPilot/releases/latest)
 ![macOS](https://img.shields.io/badge/macOS-13%2B-111111?logo=apple&logoColor=white)
 ![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D4?logo=windows&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-x64-FCC624?logo=linux&logoColor=black)
 ![Built on scrcpy](https://img.shields.io/badge/built%20on-scrcpy%204.1-3ddc84?logo=android&logoColor=white)
 
 [**Download**](https://github.com/ShortPlanet3058/StickPilot/releases/latest) · [Features](#features) · [Getting started](#getting-started) · [Keyboard shortcuts](#keyboard-shortcuts) · [Build from source](#build-from-source)
@@ -71,7 +72,7 @@ No picture, no load on the TV: a compact remote window that can stay on top whil
 <td width="50%" valign="top">
 
 ### Always within reach
-A mini remote lives in the menu bar (macOS) or the notification area (Windows). **Double-tap Right Shift** anywhere to open it. Closing the window keeps StickPilot running there, and your keyboard's media keys can control the TV too.
+A mini remote lives in the menu bar (macOS), the notification area (Windows) or the top bar (Linux). **Double-tap Right Shift** anywhere to open it (on Linux with Wayland, **Ctrl+Alt+R**). Closing the window keeps StickPilot running there, and your keyboard's media keys can control the TV too.
 
 </td>
 </tr>
@@ -117,14 +118,19 @@ Storage, memory, CPU temperature and Wi-Fi signal at a glance, plus Sleep, Wake 
 |---|---|
 | **macOS** | Open `StickPilot-…-mac-x64.dmg` and drag StickPilot to Applications. The app isn't notarized by Apple, so the first launch is blocked: open **System Settings → Privacy & Security** and click **Open Anyway**. On Apple silicon it runs through Rosetta. |
 | **Windows** | Run `StickPilot-…-win-x64-setup.exe`. It installs for your user only (no administrator rights), with Start menu and desktop shortcuts. The installer isn't signed, so SmartScreen may warn you: click **More info → Run anyway**. |
+| **Linux** | Ubuntu, Debian and derivatives: `sudo apt install ./StickPilot-…-linux-amd64.deb`, then open StickPilot from the app menu. Any other distribution (64-bit): make `StickPilot-…-linux-x86_64.AppImage` executable (`chmod +x`) and run it. |
 
 **Permissions on macOS.** StickPilot asks for **Local Network** access, which it needs to reach the TV over Wi-Fi. The Right Shift shortcut and media keys also need **Accessibility** access; StickPilot shows a button that takes you to the right setting.
 
 **USB on Windows** needs the device's ADB driver. Wi-Fi needs nothing extra.
 
+**USB on Linux** works out of the box on recent distributions. If a device shows *No USB access*, add Android's udev rules (`sudo apt install android-udev-rules` on Ubuntu or Debian) and plug it in again, or use Wi-Fi.
+
+**The mini remote on Linux.** On Wayland desktops (Ubuntu, Fedora…) apps can't watch the keyboard of other apps, so double-tap Right Shift is replaced by a system shortcut, **Ctrl+Alt+R**. The first time, the desktop asks you to allow it; you can pick other keys there, or later from the tray menu (**Change shortcut…**). The tray icon needs a desktop that shows app indicators (Ubuntu does; on stock GNOME add the *AppIndicator* extension).
+
 ## Keyboard shortcuts
 
-While StickPilot is connected and its window is active, the keyboard drives the TV. Shortcuts use **⌥ Option** on macOS and **Alt** on Windows.
+While StickPilot is connected and its window is active, the keyboard drives the TV. Shortcuts use **⌥ Option** on macOS and **Alt** on Windows and Linux.
 
 | Keys | Action | Keys | Action |
 |---|---|---|---|
@@ -137,7 +143,7 @@ While StickPilot is connected and its window is active, the keyboard drives the 
 | <kbd>⌥</kbd> <kbd>S</kbd> | Settings | <kbd>⌥</kbd> <kbd>C</kbd> | Screenshot |
 | <kbd>⌥</kbd> <kbd>Q</kbd> | Quick settings | <kbd>⌥</kbd> <kbd>⇧</kbd> <kbd>C</kbd> | Record the screen |
 | <kbd>⌥</kbd> <kbd>V</kbd> | Paste the clipboard | <kbd>⌥</kbd> <kbd>D</kbd> | Device status |
-| <kbd>⌥</kbd> <kbd>F</kbd> | Fullscreen | Right <kbd>⇧</kbd> twice | Mini remote, from anywhere |
+| <kbd>⌥</kbd> <kbd>F</kbd> | Fullscreen | Right <kbd>⇧</kbd> twice | Mini remote, from anywhere (Linux Wayland: <kbd>Ctrl</kbd> <kbd>Alt</kbd> <kbd>R</kbd>) |
 
 ## Troubleshooting
 
@@ -163,6 +169,12 @@ Use the **Responsive** profile, and turn the sound off: playing the TV's sound o
 <summary><b>Double-tap Right Shift does nothing (macOS)</b></summary>
 
 StickPilot needs Accessibility access: System Settings → Privacy & Security → Accessibility, then switch StickPilot on.
+</details>
+
+<details>
+<summary><b>The mini remote shortcut does nothing (Linux)</b></summary>
+
+On Wayland the shortcut is **Ctrl+Alt+R** (or the keys you chose when the desktop asked). If you declined, untick and tick *… opens this remote* in the tray menu to be asked again. It needs a desktop with the GlobalShortcuts portal: GNOME 48 or later, or KDE Plasma.
 </details>
 
 ## Build from source
@@ -200,6 +212,19 @@ with Start menu and desktop shortcuts. Installing, updating and uninstalling sto
 runs from StickPilot's folder (`scripts/installer.nsh`), and the app stops it when it quits.
 On Windows the double-tap Right Shift shortcut uses uiohook-napi's prebuilt binary and the tray
 icon sits in the notification area.
+
+`npm run dist:linux` builds `release/StickPilot-<version>-linux-x86_64.AppImage` and
+`release/StickPilot-<version>-linux-amd64.deb`, on Linux. It needs the Linux adb first:
+`npm run vendor -- ~/Documents/tools/scrcpy-linux-x86_64-v4.1` (the official scrcpy Linux release).
+On Linux StickPilot runs as an X11 app, through XWayland on Wayland desktops, so the mini remote can
+open under the tray icon (Wayland doesn't let apps place their windows). On Wayland the mini remote
+shortcut is a system shortcut registered through the desktop's GlobalShortcuts portal
+(`src/main/portalShortcut.ts`, over a small built-in D-Bus client), since apps there can't see keys
+typed into other apps; on X11 it is double-tap Right Shift through uiohook-napi.
+
+Both `dist:win` and `dist:linux` skip electron-builder's native rebuild (`npmRebuild=false`): the
+only native module, uiohook-napi, ships prebuilt binaries for every platform, and compiling it from
+source fails when cross-building.
 </details>
 
 <details>
@@ -223,6 +248,7 @@ evaluates code in the main process (`STICKPILOT_DEBUG=1` also exposes `globalThi
 | `src/main/profiles.ts` | Quality profiles; the software-encoder set was measured on a Fire TV Stick 4K Max |
 | `src/main/recorder.ts` | MP4 recording of the incoming H.264 stream (no re-encoding) |
 | `src/main/tray.ts` | Menu-bar / tray icon, mini remote window, media keys |
+| `src/main/doubleTap.ts`, `portalShortcut.ts`, `dbus.ts` | Mini remote shortcut: double-tap Right Shift, or the Linux Wayland system shortcut |
 | `src/main/typing.ts` | Sends typed text as text, or as letter key + OK on Amazon's letter-grid search screens |
 | `src/main/main.ts` | Electron main process and IPC |
 | `src/renderer/app.ts` | Device screen, player, device switcher, status screens |

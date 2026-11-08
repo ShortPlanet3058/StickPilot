@@ -86,6 +86,7 @@ function stateLabel(d: DeviceInfo): { text: string; cls: string } {
     case 'authorizing':
     case 'connecting': return { text: 'Connecting', cls: '' };
     case 'offline': return { text: 'Offline', cls: 'warn' };
+    case 'nopermission': return { text: 'No USB access', cls: 'warn' };
     default: return { text: 'Unknown', cls: '' };
   }
 }
@@ -239,6 +240,7 @@ function deviceCard(g: DeviceGroup): string {
       + `<button data-connect="${esc(d.serial)}" data-mode="remote" title="Control the device without mirroring its screen">${icon('remote', 16)}<span>Remote only</span></button>`;
   } else if (d.state === 'unauthorized') foot = '<p class="dcard-help">Accept "Allow USB debugging?" on the device.</p>';
   else if (d.state === 'offline') foot = '<p class="dcard-help">Reconnect the cable or restart ADB debugging.</p>';
+  else if (d.state === 'nopermission') foot = '<p class="dcard-help">Linux needs a udev rule for USB. On Ubuntu or Debian run <code>sudo apt install android-udev-rules</code>, then replug the device. Or connect over Wi-Fi.</p>';
   else foot = '<p class="dcard-help">Waiting for the device…</p>';
 
   // Pick USB or Wi-Fi when the device is reachable both ways
@@ -319,7 +321,7 @@ function renderHome(): void {
     html = `<div class="empty">
         <h2>${setup.title}</h2>
         <p>${setup.intro}</p>
-        <ol>${setup.steps.map((s) => `<li>${s}</li>`).join('')}</ol>
+        <ol>${setup.steps.map((s) => `<li><span>${s}</span></li>`).join('')}</ol>
         <p class="muted">Devices appear here as soon as they are detected.</p>
       </div>`;
   }
@@ -457,6 +459,11 @@ function statusCard(mode: SessionMode): string {
   if (d.state === 'offline') {
     return card({ icon: 'alert', warn: true, title: 'Device offline', meta,
       body: 'Reconnect the cable, or turn ADB debugging off and on again.', actions: backToDevices });
+  }
+  if (d.state === 'nopermission') {
+    return card({ icon: 'alert', warn: true, title: 'No permission to use this USB device', meta,
+      body: 'Linux needs a udev rule before adb can use the device. On Ubuntu or Debian, run <code>sudo apt install android-udev-rules</code> in a terminal, then unplug the device and plug it back in. Or connect over Wi-Fi instead, which needs no setup.',
+      actions: backToDevices });
   }
   if (d.state !== 'device') return card({ spinner: true, title: 'Waiting for the device…', meta });
   if (isLive(d.serial)) {
